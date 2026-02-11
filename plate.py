@@ -27,7 +27,7 @@ def parse_filename(filepath):
     Returns e.g. 'A01 f1', or '' if parsing fails.
     """
     basename = os.path.basename(filepath)
-    m = re.match(r'^([A-P])\s*-\s*(\d+)\(fld\s+(\d+)\s+wv\s+.+\)\.tif$', basename)
+    m = re.search(r'([A-P])\s*-\s*(\d+)\(fld\s+(\d+)\s+wv\s+.+\)\.tif$', basename)
     if m:
         return f"{m.group(1)}{m.group(2)} f{m.group(3)}"
     return ""
@@ -35,7 +35,7 @@ def parse_filename(filepath):
 
 def parse_well(filepath):
     """Extract well ID (e.g. 'A01') from a filepath, or None."""
-    m = re.match(r'^([A-P])\s*-\s*(\d+)\(', os.path.basename(filepath))
+    m = re.search(r'([A-P])\s*-\s*(\d+)\(', os.path.basename(filepath))
     if m:
         return f"{m.group(1)}{m.group(2).zfill(2)}"
     return None
