@@ -23,7 +23,7 @@ from plate import (find_images, detect_channels, detect_fields, center_field,
                    parse_well_spec, filter_images_by_wells, sort_by_field, PLATE_FORMATS)
 from image import numpy_to_b64png
 from montage import make_montage, make_well_montage, make_contact_sheet
-from heatmaps import compute_intensity_heatmap, compute_focus_heatmap
+from heatmaps import compute_intensity_heatmap, compute_focus_heatmap, compute_plls_heatmap
 
 # ---------------------------------------------------------------------------
 # Plotly figure helper
@@ -209,6 +209,39 @@ app.layout = html.Div([
         html.Button("Compute Focus Heatmap", id='btn-focus', n_clicks=0,
                     style={'margin': '10px 0'}),
         dcc.Loading(html.Div(id='focus-output')),
+        html.Details([
+            html.Summary("How to interpret VoL and PLLS", style={'cursor': 'pointer', 'fontWeight': 'bold'}),
+            html.Div([
+                html.P([
+                    html.B("Variance of Laplacian (VoL)"),
+                    " measures edge strength. It is sensitive to cell density: sparser wells score lower. "
+                    "However, VoL is fooled by camera readout noise in defocused/empty wells "
+                    "\u2014 noise has white-spectrum high-frequency content that the Laplacian "
+                    "interprets as edges, so fully defocused wells can score as the ",
+                    html.I("sharpest"),
+                    ".",
+                ]),
+                html.P([
+                    html.B("Power Log-Log Slope (PLLS)"),
+                    " measures the slope of the radially-averaged power spectrum on a log\u2013log scale "
+                    "(Bray et al., J Biomol Screen, 2012). "
+                    "More negative values indicate loss of high-frequency content (blur or emptiness). "
+                    "PLLS is much more stable across varying cell density, "
+                    "but it also fails on noise-dominated images: flat noise gives a slope near 0, "
+                    "which looks \u201csharp\u201d.",
+                ]),
+                html.P([
+                    html.B("Combining the two: "),
+                    "the metrics fail in complementary ways. "
+                    "Wells with normal cells cluster around VoL 10k\u201317k and PLLS \u22121.7 to \u22121.9. "
+                    "Defocused wells show suspiciously high VoL with PLLS near zero. "
+                    "Empty wells show very low VoL with very negative PLLS. "
+                    "Reviewing both heatmaps side by side lets a human reviewer spot these patterns; "
+                    "collapsing them into a single score would require per-instrument threshold calibration.",
+                ]),
+            ], style={'fontSize': '13px', 'color': '#444', 'lineHeight': '1.5', 'maxWidth': '900px'}),
+        ], style={'margin': '15px 0', 'padding': '10px', 'background': '#f8f8f8',
+                  'borderRadius': '6px', 'border': '1px solid #ddd'}),
     ]),
 
     # -- Hidden store --
@@ -329,10 +362,16 @@ def generate_focus_heatmap(n_clicks, channel, folder, plate_fmt):
     if not folder or not channel:
         return html.Div("Load a plate folder first.")
     plate_rows, plate_cols = PLATE_FORMATS[plate_fmt]
-    heatmap = compute_focus_heatmap(folder, channel, plate_rows, plate_cols)
-    fig = make_plate_heatmap_figure(heatmap, title=f"Focus (Laplacian variance) — {channel}",
-                                    plate_rows=plate_rows, plate_cols=plate_cols)
-    return dcc.Graph(figure=fig)
+    heatmap_lap = compute_focus_heatmap(folder, channel, plate_rows, plate_cols)
+    fig_lap = make_plate_heatmap_figure(heatmap_lap, title=f"Focus (Laplacian variance) — {channel}",
+                                        plate_rows=plate_rows, plate_cols=plate_cols)
+    heatmap_plls = compute_plls_heatmap(folder, channel, plate_rows, plate_cols)
+    fig_plls = make_plate_heatmap_figure(heatmap_plls, title=f"Focus (Power Log-Log Slope) — {channel}",
+                                         plate_rows=plate_rows, plate_cols=plate_cols)
+    return html.Div([
+        dcc.Graph(figure=fig_lap),
+        dcc.Graph(figure=fig_plls),
+    ])
 
 
 @callback(
@@ -524,7 +563,7 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
     print(f"[Save All] Saving plots to {out_dir}/ ...")
 
     # 1. Random montage
-    print("[Save All] 1/5 Generating random montage...")
+    print("[Save All] 1/6 Generating random montage...")
     images = find_images(folder, channel=channel)
     if len(images) >= cfg.MONTAGE_N_IMAGES:
         montage, _ = make_montage(images, crop_size=cfg.MONTAGE_CROP_SIZE)
@@ -533,7 +572,7 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
         saved.append("montage")
 
     # 2. Control montage (only if well spec provided)
-    print("[Save All] 2/5 Generating control montage...")
+    print("[Save All] 2/6 Generating control montage...")
     if well_spec:
         well_set = parse_well_spec(well_spec, plate_rows=plate_rows)
         if well_set:
@@ -545,7 +584,7 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
                 saved.append("controls")
 
     # 3. Plate thumbnails
-    print("[Save All] 3/5 Generating plate thumbnails...")
+    print("[Save All] 3/6 Generating plate thumbnails...")
     fields = detect_fields(folder)
     pref_field = center_field(fields)
     n_fields = len(fields) if fields else '?'
@@ -560,7 +599,7 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
     saved.append("thumbnails")
 
     # 4. Intensity heatmap
-    print("[Save All] 4/5 Computing intensity heatmap...")
+    print("[Save All] 4/6 Computing intensity heatmap...")
     heatmap_int = compute_intensity_heatmap(folder, channel, plate_rows, plate_cols)
     fig_int = make_plate_heatmap_figure(heatmap_int, title=f"Mean Intensity — {channel}",
                                         plate_rows=plate_rows, plate_cols=plate_cols)
@@ -568,14 +607,23 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
     fig_int.write_image(path, scale=2)
     saved.append("intensity")
 
-    # 5. Focus heatmap
-    print("[Save All] 5/5 Computing focus heatmap...")
+    # 5. Focus heatmap (Laplacian variance)
+    print("[Save All] 5/6 Computing focus heatmap (Laplacian variance)...")
     heatmap_foc = compute_focus_heatmap(folder, channel, plate_rows, plate_cols)
     fig_foc = make_plate_heatmap_figure(heatmap_foc, title=f"Focus (Laplacian variance) — {channel}",
                                         plate_rows=plate_rows, plate_cols=plate_cols)
     path = os.path.join(out_dir, f"{channel}_focus.png")
     fig_foc.write_image(path, scale=2)
     saved.append("focus")
+
+    # 6. Focus heatmap (PLLS)
+    print("[Save All] 6/6 Computing focus heatmap (PLLS)...")
+    heatmap_plls = compute_plls_heatmap(folder, channel, plate_rows, plate_cols)
+    fig_plls = make_plate_heatmap_figure(heatmap_plls, title=f"Focus (Power Log-Log Slope) — {channel}",
+                                         plate_rows=plate_rows, plate_cols=plate_cols)
+    path = os.path.join(out_dir, f"{channel}_plls.png")
+    fig_plls.write_image(path, scale=2)
+    saved.append("plls")
 
     print(f"[Save All] Done — saved {len(saved)} plots.")
     return f"Saved {len(saved)} plots to {out_dir}/: {', '.join(saved)}"
