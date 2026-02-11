@@ -208,19 +208,20 @@ app.layout = html.Div([
     html.Div(id='panel-focus', style={'margin': '10px', 'display': 'none'}, children=[
         html.Div([
             html.P([
-                html.B("VoL"), " \u2014 higher = sharper edges. "
+                html.B("Variance of Laplacian (VoL): "), "Higher = sharper edges. "
                 "Scales with cell density (sparse wells score lower). "
-                "Caveat: readout noise in defocused wells mimics edges, inflating VoL.",
+                "Caveat: Noise in defocused wells (i.e. fully blurry wells) mimics edges, inflating VoL. "
+                "Therefore: If VoL is high then either there are a lot of cells or we have a fully flurry image. If VoL is low then we have few cells in the image.",
             ]),
             html.P([
-                html.B("PLLS"), " (Bray et al., 2012) \u2014 "
-                "more negative = blurrier (loss of high frequencies). "
+                html.B("Power Log-Log Slope (PLLS):"), " (Bray et al., 2012) "
+                "More negative = blurrier (loss of high frequencies). "
                 "Near zero = sharp or noise-dominated. "
                 "Stable across varying cell density, but fooled by flat-spectrum noise.",
             ]),
             html.P([
                 html.B("Reading both together: "),
-                "focused wells have moderate VoL and moderately negative PLLS. "
+                "Focused wells have moderate VoL and moderately negative PLLS. "
                 "Defocused wells stand out as high VoL with PLLS near zero. "
                 "Empty wells show low VoL with very negative PLLS.",
             ]),
