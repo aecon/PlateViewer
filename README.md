@@ -1,12 +1,12 @@
 # PlateViewer
 
-Quality control visualization tools for arrayed high-content screening experiments (384-well plates).
+Quality control visualization tools for arrayed high-content screening experiments (384-well and 96-well plates).
 
 ## Setup
 
 ```bash
 conda create -n PlateViewer python=3.11 -y
-conda run -n PlateViewer pip install numpy scikit-image tifffile dash plotly pillow scipy
+conda run -n PlateViewer pip install numpy scikit-image tifffile dash plotly pillow scipy kaleido
 ```
 
 ## Web Interface
@@ -17,18 +17,19 @@ conda run -n PlateViewer python app.py
 
 The browser opens automatically. Use `--port 8051` to change the port.
 
-1. Enter the plate folder path (or click **Browse**) and click **Load**
-2. Select a channel from the dropdown
-3. Use the tabs:
+1. Enter the plate folder path (or click **Browse**, or drag-and-drop) and click **Load**
+2. Select a channel and plate format (384-well or 96-well)
+3. Optionally enter control well specifications
+4. Use the tabs:
    - **Random Montage** — 4x8 grid of randomly sampled images with well/field labels
    - **Control Montage** — 4x8 grid sampled from user-specified control wells
-   - **Plate Thumbnails** — 16x24 overview with one thumbnail per well (hover for well ID)
-   - **Intensity Heatmap** — mean pixel intensity per well (16x24 plate layout)
-   - **Focus Heatmap** — Laplacian variance per well to detect out-of-focus fields
+   - **Single Well** — all fields for a chosen well in an auto-sized grid (full images, 4x downsampled)
+   - **Plate Thumbnails** — plate-layout overview with one thumbnail per well (auto-detected center field, hover for well ID)
+   - **Intensity Heatmap** — mean pixel intensity per well (plate layout)
+   - **Focus Heatmap** — Laplacian variance per well to detect out-of-focus fields (uint8-normalized)
+5. Click **Save All Plots** to export all plots as PNGs to `<plate_folder>/PlateViewer/`
 
 ### Control well syntax
-
-The Control Montage tab accepts a flexible well specification, for example:
 
 | Format | Meaning |
 |--------|---------|
@@ -64,7 +65,7 @@ Options:
 ```
 plate.py        — Plate-level logic: file discovery, filename parsing, well utilities
 image.py        — Image utilities: uint8 conversion, label burning, PNG encoding
-montage.py      — Montage assembly + CLI entry point
+montage.py      — Montage assembly (random, single-well, contact sheet) + CLI entry point
 heatmaps.py     — Plate heatmap computation (threaded I/O, disk caching)
 app.py          — Dash web UI (thin, imports from above modules)
 ```
