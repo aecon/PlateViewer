@@ -2,6 +2,8 @@
 
 Quality control visualization tools for arrayed high-content screening experiments (384-well and 96-well plates).
 
+![Random Montage](docs/images/random_montage.png)
+
 ## Install dependencies
 
 ```bash
