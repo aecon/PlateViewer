@@ -208,22 +208,16 @@ app.layout = html.Div([
     html.Div(id='panel-focus', style={'margin': '10px', 'display': 'none'}, children=[
         html.Div([
             html.P([
-                html.B("Variance of Laplacian (VoL): "), "Higher = sharper edges. "
-                "Scales with cell density (sparse wells score lower). "
-                "Caveat: Noise in defocused wells (i.e. fully blurry wells) mimics edges, inflating VoL. "
-                "Therefore: If VoL is high then either there are a lot of cells or we have a fully flurry image. If VoL is low then we have few cells in the image.",
+                html.B("Variance of Laplacian (VoL): "),
+                "Measures how much high-frequency structure (edges/texture) is present. Higher VoL values usually correspond to sharper, more structured images, however VoL increases also with cell confluency and with increasing noise.",
             ]),
             html.P([
                 html.B("Power Log-Log Slope (PLLS):"), " (Bray et al., 2012) "
-                "More negative = blurrier (loss of high frequencies). "
-                "Near zero = sharp or noise-dominated. "
-                "Stable across varying cell density, but fooled by flat-spectrum noise.",
+                "Summarizes how quickly spectral power falls off with spatial frequency. Lower values (i.e. more negative slopes) indicate blur (loss of high frequencies), while larger values (i.e. slopes closer to zero) suggest a flatter, noise-dominated spectrum.",
             ]),
             html.P([
                 html.B("Reading both together: "),
-                "Focused wells have moderate VoL and moderately negative PLLS. "
-                "Defocused wells stand out as high VoL with PLLS near zero. "
-                "Empty wells show low VoL with very negative PLLS.",
+                "Use VoL as 'how much structure/edge content exists' and PLLS as 'is high-frequency content preserved vs suppressed': true defocus tends to decrease PLLS (often with reduced VoL), whereas noisy/artefactual images can show high VoL and PLLS.",
             ]),
         ], style={'fontSize': '13px', 'color': '#444', 'lineHeight': '1.5',
                   'maxWidth': '900px', 'padding': '10px', 'background': '#f8f8f8',
