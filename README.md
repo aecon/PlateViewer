@@ -29,6 +29,31 @@ The browser opens automatically. Use `--port 8051` to change the port.
    - **Plate Thumbnails** — plate-layout overview with one thumbnail per well (auto-detected center field, hover for well ID)
    - **Intensity Heatmap** — mean pixel intensity per well (plate layout)
    - **Focus Heatmap** — Laplacian variance per well to detect out-of-focus fields (uint8-normalized)
+
+#### Single Well
+
+Inspect all fields of a specific well. Enter a well ID (e.g. A05) to see every acquired field arranged in a grid, useful for investigating outliers spotted on heatmaps.
+
+![Single Well](docs/images/single_well.png)
+
+#### Plate Thumbnails
+
+Bird's-eye view of the entire plate. Each cell shows a thumbnail of the center field for that well. Hover over any thumbnail to see the well ID.
+
+![Plate Thumbnails](docs/images/plate_thumbnails.png)
+
+#### Intensity Heatmap
+
+Mean pixel intensity per well displayed on the plate layout. Quickly reveals systematic patterns such as edge effects or dispensing artifacts.
+
+![Intensity Heatmap](docs/images/intensity_heatmap.png)
+
+#### Focus Heatmap
+
+Laplacian variance per well (computed on uint8-normalized images). Low values flag out-of-focus wells that may need to be excluded from downstream analysis.
+
+![Focus Heatmap](docs/images/focus_heatmap.png)
+
 5. Click **Save All Plots** to export all plots as PNGs to `<plate_folder>/PlateViewer/`
 
 ### Control well syntax
