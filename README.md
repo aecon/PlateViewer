@@ -2,6 +2,13 @@
 
 Quality control visualization tools for arrayed high-content screening experiments (384-well and 96-well plates).
 
+PlateViewer helps microscopists and screening scientists quickly assess image quality across entire plates. It flags out-of-focus wells, reveals intensity patterns such as edge effects or dispensing artifacts, and lets you visually inspect any well or field — all from a browser-based interface or the command line.
+
+## Requirements
+
+- Python 3.11+
+- Images must be TIFF files (`.tif`) following the **GE InCell Analyzer** naming convention (see [Expected File Naming](#expected-file-naming) below)
+
 ## Installation
 
 ```bash
@@ -103,6 +110,22 @@ Options:
 | `-o, --output` | auto | Output TIF path |
 
 
+## Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| [Dash](https://dash.plotly.com/) | Web UI framework |
+| [Plotly](https://plotly.com/python/) | Interactive plotting |
+| NumPy | Numerical computation |
+| SciPy | Scientific computing |
+| Pillow | Image I/O and processing |
+| scikit-image | Image analysis (focus metrics) |
+| tifffile | TIFF file reading |
+| Kaleido | Static image export |
+
+All dependencies are installed via `pip install -r requirements.txt`.
+
+
 ## Project Structure
 
 ```
@@ -112,5 +135,10 @@ montage.py      — Montage assembly (random, single-well, contact sheet) + CLI 
 heatmaps.py     — Plate heatmap computation (threaded I/O, disk caching)
 app.py          — Dash web UI (thin, imports from above modules)
 ```
+
+
+## License
+
+[MIT](LICENSE)
 
 
