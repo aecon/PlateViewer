@@ -183,7 +183,8 @@ def browse_folder(n_clicks):
 )
 def load_plate(n_clicks, folder):
     if folder:
-        folder = folder.strip().removeprefix('file://')
+        from urllib.parse import unquote
+        folder = unquote(folder.strip().removeprefix('file://'))
     if not folder or not os.path.isdir(folder):
         return [], None, "Invalid folder path.", None
     channels = detect_channels(folder)
