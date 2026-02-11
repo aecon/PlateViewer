@@ -206,32 +206,30 @@ app.layout = html.Div([
         dcc.Loading(html.Div(id='intensity-output')),
     ]),
     html.Div(id='panel-focus', style={'margin': '10px', 'display': 'none'}, children=[
+        html.Div([
+            html.P([
+                html.B("VoL"), " \u2014 higher = sharper edges. "
+                "Scales with cell density (sparse wells score lower). "
+                "Caveat: readout noise in defocused wells mimics edges, inflating VoL.",
+            ]),
+            html.P([
+                html.B("PLLS"), " (Bray et al., 2012) \u2014 "
+                "more negative = blurrier (loss of high frequencies). "
+                "Near zero = sharp or noise-dominated. "
+                "Stable across varying cell density, but fooled by flat-spectrum noise.",
+            ]),
+            html.P([
+                html.B("Reading both together: "),
+                "focused wells have moderate VoL and moderately negative PLLS. "
+                "Defocused wells stand out as high VoL with PLLS near zero. "
+                "Empty wells show low VoL with very negative PLLS.",
+            ]),
+        ], style={'fontSize': '13px', 'color': '#444', 'lineHeight': '1.5',
+                  'maxWidth': '900px', 'padding': '10px', 'background': '#f8f8f8',
+                  'borderRadius': '6px', 'border': '1px solid #ddd', 'margin': '10px 0'}),
         html.Button("Compute Focus Heatmap", id='btn-focus', n_clicks=0,
                     style={'margin': '10px 0'}),
         dcc.Loading(html.Div(id='focus-output')),
-        html.Details([
-            html.Summary("How to interpret VoL and PLLS", style={'cursor': 'pointer', 'fontWeight': 'bold'}),
-            html.Div([
-                html.P([
-                    html.B("VoL"), " \u2014 higher = sharper edges. "
-                    "Scales with cell density (sparse wells score lower). "
-                    "Caveat: readout noise in defocused wells mimics edges, inflating VoL.",
-                ]),
-                html.P([
-                    html.B("PLLS"), " (Bray et al., 2012) \u2014 "
-                    "more negative = blurrier (loss of high frequencies). "
-                    "Near zero = sharp or noise-dominated. "
-                    "Stable across varying cell density, but fooled by flat-spectrum noise.",
-                ]),
-                html.P([
-                    html.B("Reading both together: "),
-                    "focused wells have moderate VoL and moderately negative PLLS. "
-                    "Defocused wells stand out as high VoL with PLLS near zero. "
-                    "Empty wells show low VoL with very negative PLLS.",
-                ]),
-            ], style={'fontSize': '13px', 'color': '#444', 'lineHeight': '1.5', 'maxWidth': '900px'}),
-        ], style={'margin': '15px 0', 'padding': '10px', 'background': '#f8f8f8',
-                  'borderRadius': '6px', 'border': '1px solid #ddd'}),
     ]),
 
     # -- Hidden store --
