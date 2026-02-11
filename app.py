@@ -61,6 +61,7 @@ app.layout = html.Div([
         html.Label("Plate folder:"),
         dcc.Input(id='plate-folder', type='text', placeholder='/path/to/plate/folder',
                   style={'width': '600px', 'marginRight': '10px'}),
+        html.Button("Browse", id='btn-browse', n_clicks=0, style={'marginRight': '5px'}),
         html.Button("Load", id='btn-load', n_clicks=0),
     ], style={'margin': '10px'}),
 
@@ -89,6 +90,22 @@ app.layout = html.Div([
 # ---------------------------------------------------------------------------
 # Callbacks
 # ---------------------------------------------------------------------------
+
+@callback(
+    Output('plate-folder', 'value'),
+    Input('btn-browse', 'n_clicks'),
+    prevent_initial_call=True,
+)
+def browse_folder(n_clicks):
+    import tkinter as tk
+    from tkinter import filedialog
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    folder = filedialog.askdirectory(title="Select plate folder")
+    root.destroy()
+    return folder if folder else dash.no_update
+
 
 @callback(
     Output('channel-dropdown', 'options'),
