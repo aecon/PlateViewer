@@ -127,7 +127,7 @@ def make_contact_sheet(image_list, thumb_size=128, spacing=2, plate_rows=16, pla
 
     sheet_h = plate_rows * thumb_size + (plate_rows - 1) * spacing
     sheet_w = plate_cols * thumb_size + (plate_cols - 1) * spacing
-    sheet = np.zeros((sheet_h, sheet_w), dtype=np.uint8)
+    sheet = np.full((sheet_h, sheet_w), 255, dtype=np.uint8)
 
     from skimage.transform import resize
 

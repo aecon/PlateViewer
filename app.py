@@ -275,9 +275,17 @@ def generate_contact_sheet(n_clicks, channel, folder):
     images = find_images(folder, channel=channel)
     if not images:
         return html.Div("No images found.")
-    sheet, well_positions = make_contact_sheet(images, thumb_size=128, spacing=2)
+    thumb_size = 128
+    spacing = 2
+    sheet, well_positions = make_contact_sheet(images, thumb_size=thumb_size, spacing=spacing)
     b64 = numpy_to_b64png(sheet)
     h, w = sheet.shape
+
+    step = thumb_size + spacing
+    col_tick_vals = [i * step + thumb_size // 2 for i in range(24)]
+    col_tick_labels = [str(i + 1) for i in range(24)]
+    row_tick_vals = [i * step + thumb_size // 2 for i in range(16)]
+    row_tick_labels = [chr(ord('A') + i) for i in range(16)]
 
     fig = go.Figure()
     # display the contact sheet as a background image
@@ -296,14 +304,28 @@ def generate_contact_sheet(n_clicks, channel, folder):
         text=labels,
         hovertemplate='Well: %{text}<extra></extra>',
     ))
-    fig.update_xaxes(range=[0, w], visible=False, scaleanchor='y')
-    fig.update_yaxes(range=[h, 0], visible=False)
-    fig.update_layout(
-        width=w, height=h,
-        margin=dict(l=0, r=0, t=30, b=0),
-        title=f"Plate Thumbnails — field 5 per well ({channel} channel)",
+    fig.update_xaxes(
+        range=[0, w], side='top',
+        tickvals=col_tick_vals, ticktext=col_tick_labels,
+        tickfont=dict(size=11), showgrid=False, zeroline=False,
+        constrain='domain',
     )
-    return dcc.Graph(figure=fig)
+    fig.update_yaxes(
+        range=[h, 0],
+        tickvals=row_tick_vals, ticktext=row_tick_labels,
+        tickfont=dict(size=11), showgrid=False, zeroline=False,
+        scaleanchor='x', constrain='domain',
+    )
+    fig_width = 1150
+    fig_height = int(fig_width * h / w) + 60
+    fig.update_layout(
+        width=fig_width, height=fig_height,
+        margin=dict(l=20, r=10, t=50, b=10),
+        title=f"Plate Thumbnails — field 5 per well ({channel} channel)",
+        showlegend=False,
+        plot_bgcolor='black',
+    )
+    return dcc.Graph(figure=fig, style={'width': '100%'}, config={'responsive': True})
 
 
 # ---------------------------------------------------------------------------
