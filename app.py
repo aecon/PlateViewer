@@ -213,31 +213,21 @@ app.layout = html.Div([
             html.Summary("How to interpret VoL and PLLS", style={'cursor': 'pointer', 'fontWeight': 'bold'}),
             html.Div([
                 html.P([
-                    html.B("Variance of Laplacian (VoL)"),
-                    " measures edge strength. It is sensitive to cell density: sparser wells score lower. "
-                    "However, VoL is fooled by camera readout noise in defocused/empty wells "
-                    "\u2014 noise has white-spectrum high-frequency content that the Laplacian "
-                    "interprets as edges, so fully defocused wells can score as the ",
-                    html.I("sharpest"),
-                    ".",
+                    html.B("VoL"), " \u2014 higher = sharper edges. "
+                    "Scales with cell density (sparse wells score lower). "
+                    "Caveat: readout noise in defocused wells mimics edges, inflating VoL.",
                 ]),
                 html.P([
-                    html.B("Power Log-Log Slope (PLLS)"),
-                    " measures the slope of the radially-averaged power spectrum on a log\u2013log scale "
-                    "(Bray et al., J Biomol Screen, 2012). "
-                    "More negative values indicate loss of high-frequency content (blur or emptiness). "
-                    "PLLS is much more stable across varying cell density, "
-                    "but it also fails on noise-dominated images: flat noise gives a slope near 0, "
-                    "which looks \u201csharp\u201d.",
+                    html.B("PLLS"), " (Bray et al., 2012) \u2014 "
+                    "more negative = blurrier (loss of high frequencies). "
+                    "Near zero = sharp or noise-dominated. "
+                    "Stable across varying cell density, but fooled by flat-spectrum noise.",
                 ]),
                 html.P([
-                    html.B("Combining the two: "),
-                    "the metrics fail in complementary ways. "
-                    "Wells with normal cells cluster around VoL 10k\u201317k and PLLS \u22121.7 to \u22121.9. "
-                    "Defocused wells show suspiciously high VoL with PLLS near zero. "
-                    "Empty wells show very low VoL with very negative PLLS. "
-                    "Reviewing both heatmaps side by side lets a human reviewer spot these patterns; "
-                    "collapsing them into a single score would require per-instrument threshold calibration.",
+                    html.B("Reading both together: "),
+                    "focused wells have moderate VoL and moderately negative PLLS. "
+                    "Defocused wells stand out as high VoL with PLLS near zero. "
+                    "Empty wells show low VoL with very negative PLLS.",
                 ]),
             ], style={'fontSize': '13px', 'color': '#444', 'lineHeight': '1.5', 'maxWidth': '900px'}),
         ], style={'margin': '15px 0', 'padding': '10px', 'background': '#f8f8f8',
