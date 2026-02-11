@@ -80,7 +80,22 @@ app.layout = html.Div([
         dcc.Tab(label='Focus Heatmap', value='tab-focus'),
     ]),
 
-    html.Div(id='tab-content', style={'margin': '10px'}),
+    # -- Tab panels (all rendered, visibility toggled) --
+    html.Div(id='panel-montage', style={'margin': '10px'}, children=[
+        html.Button("Generate Montage", id='btn-montage', n_clicks=0,
+                    style={'margin': '10px 0'}),
+        dcc.Loading(html.Div(id='montage-output')),
+    ]),
+    html.Div(id='panel-intensity', style={'margin': '10px', 'display': 'none'}, children=[
+        html.Button("Compute Intensity Heatmap", id='btn-intensity', n_clicks=0,
+                    style={'margin': '10px 0'}),
+        dcc.Loading(html.Div(id='intensity-output')),
+    ]),
+    html.Div(id='panel-focus', style={'margin': '10px', 'display': 'none'}, children=[
+        html.Button("Compute Focus Heatmap", id='btn-focus', n_clicks=0,
+                    style={'margin': '10px 0'}),
+        dcc.Loading(html.Div(id='focus-output')),
+    ]),
 
     # -- Hidden store --
     dcc.Store(id='plate-folder-store'),
@@ -128,35 +143,16 @@ def load_plate(n_clicks, folder):
 
 
 @callback(
-    Output('tab-content', 'children'),
+    Output('panel-montage', 'style'),
+    Output('panel-intensity', 'style'),
+    Output('panel-focus', 'style'),
     Input('tabs', 'value'),
-    Input('channel-dropdown', 'value'),
-    State('plate-folder-store', 'data'),
-    prevent_initial_call=True,
 )
-def render_tab(tab, channel, folder):
-    if not folder or not channel:
-        return html.Div("Load a plate folder first.")
-
-    if tab == 'tab-montage':
-        return html.Div([
-            html.Button("Generate Montage", id='btn-montage', n_clicks=0,
-                        style={'margin': '10px 0'}),
-            dcc.Loading(html.Div(id='montage-output')),
-        ])
-    elif tab == 'tab-intensity':
-        return html.Div([
-            html.Button("Compute Intensity Heatmap", id='btn-intensity', n_clicks=0,
-                        style={'margin': '10px 0'}),
-            dcc.Loading(html.Div(id='intensity-output')),
-        ])
-    elif tab == 'tab-focus':
-        return html.Div([
-            html.Button("Compute Focus Heatmap", id='btn-focus', n_clicks=0,
-                        style={'margin': '10px 0'}),
-            dcc.Loading(html.Div(id='focus-output')),
-        ])
-    return html.Div()
+def toggle_tab_visibility(tab):
+    styles = [{'margin': '10px', 'display': 'none'} for _ in range(3)]
+    idx = {'tab-montage': 0, 'tab-intensity': 1, 'tab-focus': 2}.get(tab, 0)
+    styles[idx] = {'margin': '10px', 'display': 'block'}
+    return styles
 
 
 @callback(
