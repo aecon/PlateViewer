@@ -142,3 +142,10 @@ app.py          — Dash web UI (thin, imports from above modules)
 [MIT License](LICENSE)  
 Copyright (c) 2026 E. Athena Economides
 
+**E. Athena Economides, PhD**  
+Prof. Adriano Aguzzi Lab  
+Institute of Neuropathology  
+University of Zurich & University Hospital Zurich  
+Schmelzbergstrasse 12  
+CH-8091 Zurich  
+Switzerland  
