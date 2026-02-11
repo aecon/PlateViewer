@@ -92,14 +92,12 @@ Mean pixel intensity per well. Reveals systematic patterns such as edge effects 
 
 #### Focus Heatmaps
 
-Two complementary metrics are shown side by side:
+Two complementary metrics are shown:
 
 - **Variance of Laplacian (VoL)** — measures edge/texture content. Higher values indicate sharper images, but VoL also increases with cell confluency and noise.
 - **Power Log-Log Slope (PLLS)** (Bray et al., 2012) — summarizes how quickly spectral power falls off with spatial frequency. More negative values indicate blur; values near zero suggest sharp or noise-dominated images.
 
-| VoL Heatmap | PLLS Heatmap |
-|---|---|
-| ![Focus Heatmap (VoL)](docs/images/focus_heatmap.png) | ![Focus Heatmap (PLLS)](docs/images/plls_heatmap.png) |
+![Focus Heatmaps](docs/images/focus_heatmaps.png)
 
 
 ## CLI Montage Tool
