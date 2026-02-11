@@ -86,12 +86,18 @@ app.layout = html.Div([
         ),
     ], style={'margin': '10px', 'display': 'flex', 'alignItems': 'center', 'gap': '10px'}),
 
-    # -- Save All button --
+    # -- Control wells + Save All --
     html.Div([
+        html.Label("Control wells:"),
+        dcc.Input(id='control-wells-input', type='text',
+                  placeholder='e.g. A-H:5, I-P:13',
+                  style={'width': '300px'}),
+        html.Span("Syntax: A-H:5, col:1-2, A05",
+                  style={'color': '#888', 'fontSize': '12px'}),
         html.Button("Save All Plots", id='btn-save-all', n_clicks=0,
-                    style={'marginRight': '10px'}),
+                    style={'marginLeft': 'auto'}),
         html.Span(id='save-all-status', style={'color': '#666'}),
-    ], style={'margin': '10px'}),
+    ], style={'margin': '10px', 'display': 'flex', 'alignItems': 'center', 'gap': '10px'}),
 
     # -- Tabs --
     dcc.Tabs(id='tabs', value='tab-montage', children=[
@@ -109,15 +115,8 @@ app.layout = html.Div([
         dcc.Loading(html.Div(id='montage-output')),
     ]),
     html.Div(id='panel-controls', style={'margin': '10px', 'display': 'none'}, children=[
-        html.Div([
-            html.Label("Control wells: "),
-            dcc.Input(id='control-wells-input', type='text',
-                      placeholder='e.g. A-H:5, I-P:13',
-                      style={'width': '400px', 'marginRight': '10px'}),
-            html.Button("Generate", id='btn-controls', n_clicks=0),
-        ], style={'margin': '10px 0'}),
-        html.P("Syntax: A-H:5 (rows A-H col 5), col:1-2 (full columns), A05 (single well)",
-               style={'color': '#888', 'fontSize': '12px'}),
+        html.Button("Generate Control Montage", id='btn-controls', n_clicks=0,
+                    style={'margin': '10px 0'}),
         dcc.Loading(html.Div(id='controls-output')),
     ]),
     html.Div(id='panel-contact', style={'margin': '10px', 'display': 'none'}, children=[
