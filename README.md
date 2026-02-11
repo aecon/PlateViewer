@@ -139,6 +139,6 @@ app.py          — Dash web UI (thin, imports from above modules)
 
 ## License
 
-[MIT](LICENSE)
-
+[MIT License](LICENSE)  
+Copyright (c) 2026 E. Athena Economides
 
