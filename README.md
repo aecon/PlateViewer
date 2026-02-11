@@ -36,7 +36,7 @@ The browser opens automatically. Use `--port 8051` to change the port.
    - **Single Well**: all fields for a chosen well in an auto-sized grid (full images, 4x downsampled)
    - **Plate Thumbnails**: plate-layout overview with one thumbnail per well (auto-detected center field, hover for well ID)
    - **Intensity Heatmap**: mean pixel intensity per well (plate layout)
-   - **Focus Heatmap**: Laplacian variance per well to detect out-of-focus fields (uint8-normalized).  
+   - **Focus Heatmap**: two heatmaps — Variance of Laplacian (VoL) and Power Log-Log Slope (PLLS) — with an interpretation guide explaining how to read them together.
 5. Click **Save All Plots** to automatically export all plots as PNGs to `<plate_folder>/PlateViewer/`
 
 _Note: Heatmap results are cached as `.npy` files in the plate folder. Delete them to force recomputation._
@@ -84,12 +84,22 @@ Bird's-eye view of the entire plate. Each cell shows a thumbnail of the center f
 
 ![Plate Thumbnails](docs/images/plate_thumbnails.png)
 
-#### Intensity & Focus Heatmaps
+#### Intensity Heatmap
 
-| Intensity Heatmap | Focus Heatmap |
+![Intensity Heatmap](docs/images/intensity_heatmap.png)
+
+Mean pixel intensity per well. Reveals systematic patterns such as edge effects or dispensing artifacts.
+
+#### Focus Heatmaps
+
+Two complementary metrics are shown side by side:
+
+- **Variance of Laplacian (VoL)** — measures edge/texture content. Higher values indicate sharper images, but VoL also increases with cell confluency and noise.
+- **Power Log-Log Slope (PLLS)** (Bray et al., 2012) — summarizes how quickly spectral power falls off with spatial frequency. More negative values indicate blur; values near zero suggest sharp or noise-dominated images.
+
+| VoL Heatmap | PLLS Heatmap |
 |---|---|
-| ![Intensity Heatmap](docs/images/intensity_heatmap.png) | ![Focus Heatmap](docs/images/focus_heatmap.png) |
-| Mean pixel intensity per well. Reveals systematic patterns such as edge effects or dispensing artifacts. | Laplacian variance per well (uint8-normalized). Low values flag out-of-focus wells to exclude from analysis. |
+| ![Focus Heatmap (VoL)](docs/images/focus_heatmap.png) | ![Focus Heatmap (PLLS)](docs/images/plls_heatmap.png) |
 
 
 ## CLI Montage Tool
@@ -119,7 +129,7 @@ Options:
 | NumPy | Numerical computation |
 | SciPy | Scientific computing |
 | Pillow | Image I/O and processing |
-| scikit-image | Image analysis (focus metrics) |
+| scikit-image | Image resizing (contact sheet thumbnails) |
 | tifffile | TIFF file reading |
 | Kaleido | Static image export |
 
@@ -129,6 +139,7 @@ All dependencies are installed via `pip install -r requirements.txt`.
 ## Project Structure
 
 ```
+config.py       — Centralized constants (montage params, font path, threading, etc.)
 plate.py        — Plate-level logic: file discovery, filename parsing, well utilities
 image.py        — Image utilities: uint8 conversion, label burning, PNG encoding
 montage.py      — Montage assembly (random, single-well, contact sheet) + CLI entry point
