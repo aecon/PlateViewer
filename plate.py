@@ -1,8 +1,15 @@
 """Plate-level logic: file discovery, filename parsing, well utilities."""
 
 import glob
+import math
 import os
 import re
+
+
+PLATE_FORMATS = {
+    '384': (16, 24),
+    '96': (8, 12),
+}
 
 
 def find_images(plate_folder, channel=None):
@@ -56,6 +63,24 @@ def detect_wells(plate_folder):
     return sorted(wells)
 
 
+def detect_fields(plate_folder):
+    """Scan filenames and return sorted list of field numbers (e.g. [1, 2, ..., 9])."""
+    tifs = glob.glob(os.path.join(plate_folder, "*.tif"))
+    fields = set()
+    for f in tifs[:200]:
+        m = re.search(r'fld\s+(\d+)', os.path.basename(f))
+        if m:
+            fields.add(int(m.group(1)))
+    return sorted(fields)
+
+
+def center_field(fields):
+    """Given a sorted list of field numbers, return the center field number."""
+    if not fields:
+        return 5  # fallback default
+    return fields[math.ceil(len(fields) / 2) - 1]
+
+
 def well_to_row_col(well_id):
     """Convert 'A01' -> (0, 0), 'P24' -> (15, 23)."""
     row = ord(well_id[0]) - ord('A')
@@ -63,15 +88,22 @@ def well_to_row_col(well_id):
     return row, col
 
 
-def parse_well_spec(spec):
+def parse_well_spec(spec, plate_rows=16):
     """Parse a flexible well specification string into a set of well IDs.
 
     Supported formats (comma-separated, can be mixed):
         A05         — single well
         A-H:5       — rows A through H, column 5
         I-P:13      — rows I through P, column 13
-        col:1-2     — all rows (A-P), columns 1 and 2
+        col:1-2     — all rows, columns 1 and 2
         A01-A09     — well range within a single row
+
+    Parameters
+    ----------
+    spec : str
+        Well specification string.
+    plate_rows : int
+        Number of rows in the plate (16 for 384-well, 8 for 96-well).
 
     Example: "A-H:5, I-P:13" -> {'A05','B05',...,'H05','I13','J13',...,'P13'}
     """
@@ -87,7 +119,7 @@ def parse_well_spec(spec):
             c_start = int(m.group(1))
             c_end = int(m.group(2)) if m.group(2) else c_start
             for c in range(c_start, c_end + 1):
-                for row_letter in [chr(ord('A') + r) for r in range(16)]:
+                for row_letter in [chr(ord('A') + r) for r in range(plate_rows)]:
                     wells.add(f"{row_letter}{c:02d}")
             continue
 

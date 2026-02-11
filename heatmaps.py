@@ -39,18 +39,19 @@ def _read_and_focus(fpath):
 # Aggregation and caching
 # ---------------------------------------------------------------------------
 
-def _aggregate_to_heatmap(results):
-    """Take list of (well_id, value) tuples and return a 16x24 array."""
+def _aggregate_to_heatmap(results, plate_rows=16, plate_cols=24):
+    """Take list of (well_id, value) tuples and return a plate-shaped array."""
     well_values = {}
     for item in results:
         if item is None:
             continue
         well, val = item
         well_values.setdefault(well, []).append(val)
-    heatmap = np.full((16, 24), np.nan)
+    heatmap = np.full((plate_rows, plate_cols), np.nan)
     for well, vals in well_values.items():
         r, c = well_to_row_col(well)
-        heatmap[r, c] = np.mean(vals)
+        if r < plate_rows and c < plate_cols:
+            heatmap[r, c] = np.mean(vals)
     return heatmap
 
 
@@ -64,31 +65,35 @@ def _cache_path(plate_folder, channel, metric):
 # Public API
 # ---------------------------------------------------------------------------
 
-def compute_intensity_heatmap(plate_folder, channel):
-    """Compute mean intensity per well for a given channel. Returns a 16x24 array."""
+def compute_intensity_heatmap(plate_folder, channel, plate_rows=16, plate_cols=24):
+    """Compute mean intensity per well for a given channel. Returns a plate-shaped array."""
     cache = _cache_path(plate_folder, channel, "intensity")
     if os.path.exists(cache):
-        print(f"  Loading cached intensity heatmap: {cache}")
-        return np.load(cache)
+        cached = np.load(cache)
+        if cached.shape == (plate_rows, plate_cols):
+            print(f"  Loading cached intensity heatmap: {cache}")
+            return cached
     images = find_images(plate_folder, channel=channel)
     with concurrent.futures.ThreadPoolExecutor(max_workers=N_WORKERS) as pool:
         results = list(pool.map(_read_and_mean, images))
-    heatmap = _aggregate_to_heatmap(results)
+    heatmap = _aggregate_to_heatmap(results, plate_rows, plate_cols)
     np.save(cache, heatmap)
     print(f"  Cached intensity heatmap: {cache}")
     return heatmap
 
 
-def compute_focus_heatmap(plate_folder, channel):
-    """Compute Laplacian variance (focus metric) per well. Returns a 16x24 array."""
+def compute_focus_heatmap(plate_folder, channel, plate_rows=16, plate_cols=24):
+    """Compute Laplacian variance (focus metric) per well. Returns a plate-shaped array."""
     cache = _cache_path(plate_folder, channel, "focus")
     if os.path.exists(cache):
-        print(f"  Loading cached focus heatmap: {cache}")
-        return np.load(cache)
+        cached = np.load(cache)
+        if cached.shape == (plate_rows, plate_cols):
+            print(f"  Loading cached focus heatmap: {cache}")
+            return cached
     images = find_images(plate_folder, channel=channel)
     with concurrent.futures.ThreadPoolExecutor(max_workers=N_WORKERS) as pool:
         results = list(pool.map(_read_and_focus, images))
-    heatmap = _aggregate_to_heatmap(results)
+    heatmap = _aggregate_to_heatmap(results, plate_rows, plate_cols)
     np.save(cache, heatmap)
     print(f"  Cached focus heatmap: {cache}")
     return heatmap

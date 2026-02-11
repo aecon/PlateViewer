@@ -16,7 +16,8 @@ import dash
 from dash import html, dcc, Input, Output, State, callback
 import plotly.graph_objects as go
 
-from plate import find_images, detect_channels, parse_well_spec, filter_images_by_wells
+from plate import (find_images, detect_channels, detect_fields, center_field,
+                   parse_well_spec, filter_images_by_wells, PLATE_FORMATS)
 from image import numpy_to_b64png
 from montage import make_montage, make_contact_sheet
 from heatmaps import compute_intensity_heatmap, compute_focus_heatmap
@@ -25,10 +26,10 @@ from heatmaps import compute_intensity_heatmap, compute_focus_heatmap
 # Plotly figure helper
 # ---------------------------------------------------------------------------
 
-def make_plate_heatmap_figure(heatmap, title=""):
-    """Create a Plotly heatmap figure shaped as a 384-well plate."""
-    row_labels = [chr(ord('A') + i) for i in range(16)]
-    col_labels = [str(i + 1) for i in range(24)]
+def make_plate_heatmap_figure(heatmap, title="", plate_rows=16, plate_cols=24):
+    """Create a Plotly heatmap figure shaped as a plate."""
+    row_labels = [chr(ord('A') + i) for i in range(plate_rows)]
+    col_labels = [str(i + 1) for i in range(plate_cols)]
     fig = go.Figure(data=go.Heatmap(
         z=heatmap,
         x=col_labels,
@@ -68,11 +69,20 @@ app.layout = html.Div([
 
     html.Div(id='folder-status', style={'margin': '10px', 'color': '#666'}),
 
-    # -- Channel selector --
+    # -- Channel selector + Plate format --
     html.Div([
         html.Label("Channel:"),
         dcc.Dropdown(id='channel-dropdown', style={'width': '200px', 'display': 'inline-block'}),
-    ], style={'margin': '10px'}),
+        html.Label("Plate format:", style={'marginLeft': '30px'}),
+        dcc.Dropdown(
+            id='plate-format-dropdown',
+            options=[{'label': '384-well (16×24)', 'value': '384'},
+                     {'label': '96-well (8×12)', 'value': '96'}],
+            value='384',
+            style={'width': '200px', 'display': 'inline-block'},
+            clearable=False,
+        ),
+    ], style={'margin': '10px', 'display': 'flex', 'alignItems': 'center', 'gap': '10px'}),
 
     # -- Tabs --
     dcc.Tabs(id='tabs', value='tab-montage', children=[
@@ -206,13 +216,16 @@ def generate_montage(n_clicks, channel, folder):
     Input('btn-intensity', 'n_clicks'),
     State('channel-dropdown', 'value'),
     State('plate-folder-store', 'data'),
+    State('plate-format-dropdown', 'value'),
     prevent_initial_call=True,
 )
-def generate_intensity_heatmap(n_clicks, channel, folder):
+def generate_intensity_heatmap(n_clicks, channel, folder, plate_fmt):
     if not folder or not channel:
         return html.Div("Load a plate folder first.")
-    heatmap = compute_intensity_heatmap(folder, channel)
-    fig = make_plate_heatmap_figure(heatmap, title=f"Mean Intensity — {channel}")
+    plate_rows, plate_cols = PLATE_FORMATS[plate_fmt]
+    heatmap = compute_intensity_heatmap(folder, channel, plate_rows, plate_cols)
+    fig = make_plate_heatmap_figure(heatmap, title=f"Mean Intensity — {channel}",
+                                    plate_rows=plate_rows, plate_cols=plate_cols)
     return dcc.Graph(figure=fig)
 
 
@@ -221,13 +234,16 @@ def generate_intensity_heatmap(n_clicks, channel, folder):
     Input('btn-focus', 'n_clicks'),
     State('channel-dropdown', 'value'),
     State('plate-folder-store', 'data'),
+    State('plate-format-dropdown', 'value'),
     prevent_initial_call=True,
 )
-def generate_focus_heatmap(n_clicks, channel, folder):
+def generate_focus_heatmap(n_clicks, channel, folder, plate_fmt):
     if not folder or not channel:
         return html.Div("Load a plate folder first.")
-    heatmap = compute_focus_heatmap(folder, channel)
-    fig = make_plate_heatmap_figure(heatmap, title=f"Focus (Laplacian variance) — {channel}")
+    plate_rows, plate_cols = PLATE_FORMATS[plate_fmt]
+    heatmap = compute_focus_heatmap(folder, channel, plate_rows, plate_cols)
+    fig = make_plate_heatmap_figure(heatmap, title=f"Focus (Laplacian variance) — {channel}",
+                                    plate_rows=plate_rows, plate_cols=plate_cols)
     return dcc.Graph(figure=fig)
 
 
@@ -237,14 +253,16 @@ def generate_focus_heatmap(n_clicks, channel, folder):
     State('control-wells-input', 'value'),
     State('channel-dropdown', 'value'),
     State('plate-folder-store', 'data'),
+    State('plate-format-dropdown', 'value'),
     prevent_initial_call=True,
 )
-def generate_controls_montage(n_clicks, well_spec, channel, folder):
+def generate_controls_montage(n_clicks, well_spec, channel, folder, plate_fmt):
     if not folder or not channel:
         return html.Div("Load a plate folder first.")
     if not well_spec:
         return html.Div("Enter control well specification.")
-    well_set = parse_well_spec(well_spec)
+    plate_rows, plate_cols = PLATE_FORMATS[plate_fmt]
+    well_set = parse_well_spec(well_spec, plate_rows=plate_rows)
     if not well_set:
         return html.Div(f"Could not parse well specification: {well_spec}")
     images = find_images(folder, channel=channel)
@@ -267,34 +285,42 @@ def generate_controls_montage(n_clicks, well_spec, channel, folder):
     Input('btn-contact', 'n_clicks'),
     State('channel-dropdown', 'value'),
     State('plate-folder-store', 'data'),
+    State('plate-format-dropdown', 'value'),
     prevent_initial_call=True,
 )
-def generate_contact_sheet(n_clicks, channel, folder):
+def generate_contact_sheet(n_clicks, channel, folder, plate_fmt):
     if not folder or not channel:
         return html.Div("Load a plate folder first.")
     images = find_images(folder, channel=channel)
     if not images:
         return html.Div("No images found.")
+
+    plate_rows, plate_cols = PLATE_FORMATS[plate_fmt]
+    fields = detect_fields(folder)
+    pref_field = center_field(fields)
+
     thumb_size = 128
     spacing = 2
-    sheet, well_positions = make_contact_sheet(images, thumb_size=thumb_size, spacing=spacing)
+    sheet, well_positions = make_contact_sheet(
+        images, thumb_size=thumb_size, spacing=spacing,
+        plate_rows=plate_rows, plate_cols=plate_cols,
+        preferred_field=pref_field,
+    )
     b64 = numpy_to_b64png(sheet)
     h, w = sheet.shape
 
     step = thumb_size + spacing
-    col_tick_vals = [i * step + thumb_size // 2 for i in range(24)]
-    col_tick_labels = [str(i + 1) for i in range(24)]
-    row_tick_vals = [i * step + thumb_size // 2 for i in range(16)]
-    row_tick_labels = [chr(ord('A') + i) for i in range(16)]
+    col_tick_vals = [i * step + thumb_size // 2 for i in range(plate_cols)]
+    col_tick_labels = [str(i + 1) for i in range(plate_cols)]
+    row_tick_vals = [i * step + thumb_size // 2 for i in range(plate_rows)]
+    row_tick_labels = [chr(ord('A') + i) for i in range(plate_rows)]
 
     fig = go.Figure()
-    # display the contact sheet as a background image
     fig.add_layout_image(
         source=b64, xref="x", yref="y",
         x=0, y=0, sizex=w, sizey=h,
         sizing="stretch", layer="below",
     )
-    # invisible scatter markers for hover
     xs = [pos[0] for pos in well_positions.values()]
     ys = [pos[1] for pos in well_positions.values()]
     labels = list(well_positions.keys())
@@ -318,10 +344,11 @@ def generate_contact_sheet(n_clicks, channel, folder):
     )
     fig_width = 1150
     fig_height = int(fig_width * h / w) + 60
+    n_fields = len(fields) if fields else '?'
     fig.update_layout(
         width=fig_width, height=fig_height,
         margin=dict(l=20, r=10, t=50, b=10),
-        title=f"Plate Thumbnails — field 5 per well ({channel} channel)",
+        title=f"Plate Thumbnails — field {pref_field} per well ({n_fields} fields detected, {channel} channel)",
         showlegend=False,
         plot_bgcolor='black',
     )

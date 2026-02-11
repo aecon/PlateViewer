@@ -89,10 +89,11 @@ def make_montage(image_list, n_images=32, rows=4, cols=8, crop_size=512, spacing
     return montage, selected_files
 
 
-def make_contact_sheet(image_list, thumb_size=128, spacing=2, plate_rows=16, plate_cols=24):
-    """Create a plate-layout contact sheet: one thumbnail per well in 16x24 grid.
+def make_contact_sheet(image_list, thumb_size=128, spacing=2, plate_rows=16, plate_cols=24,
+                       preferred_field=None):
+    """Create a plate-layout contact sheet: one thumbnail per well in a plate grid.
 
-    Uses the first field found for each well as the representative image.
+    Uses the preferred field (or first found) for each well as the representative image.
 
     Parameters
     ----------
@@ -103,9 +104,12 @@ def make_contact_sheet(image_list, thumb_size=128, spacing=2, plate_rows=16, pla
     spacing : int
         Gap between thumbnails (pixels).
     plate_rows : int
-        Number of rows in the plate (16 for 384-well).
+        Number of rows in the plate (16 for 384-well, 8 for 96-well).
     plate_cols : int
-        Number of columns in the plate (24 for 384-well).
+        Number of columns in the plate (24 for 384-well, 12 for 96-well).
+    preferred_field : int or None
+        Field number to prefer as the representative image per well (e.g. 5).
+        If None, uses the first field found.
 
     Returns
     -------
@@ -114,15 +118,15 @@ def make_contact_sheet(image_list, thumb_size=128, spacing=2, plate_rows=16, pla
     well_positions : dict
         Mapping of well_id -> (x_center, y_center) in pixel coords of the sheet.
     """
-    # group images by well, prefer field 5 (center tile)
+    preferred_tag = f'fld {preferred_field}' if preferred_field else None
     well_images = {}
     for fpath in image_list:
         w = parse_well(fpath)
         if not w:
             continue
         basename = os.path.basename(fpath)
-        is_fld5 = 'fld 5' in basename
-        if w not in well_images or is_fld5:
+        is_preferred = preferred_tag and preferred_tag in basename
+        if w not in well_images or is_preferred:
             well_images[w] = fpath
 
     sheet_h = plate_rows * thumb_size + (plate_rows - 1) * spacing
