@@ -113,11 +113,4 @@ heatmaps.py     — Plate heatmap computation (threaded I/O, disk caching)
 app.py          — Dash web UI (thin, imports from above modules)
 ```
 
-## Author
-**Athena Economides, PhD**  
-Prof. Adriano Aguzzi Lab  
-Institute of Neuropathology  
-University of Zurich & University Hospital Zurich  
-Schmelzbergstrasse 12  
-CH-8091 Zurich  
-Switzerland  
+
