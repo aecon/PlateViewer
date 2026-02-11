@@ -42,17 +42,12 @@ Bird's-eye view of the entire plate. Each cell shows a thumbnail of the center f
 
 ![Plate Thumbnails](docs/images/plate_thumbnails.png)
 
-#### Intensity Heatmap
+#### Intensity & Focus Heatmaps
 
-Mean pixel intensity per well displayed on the plate layout. Quickly reveals systematic patterns such as edge effects or dispensing artifacts.
-
-![Intensity Heatmap](docs/images/intensity_heatmap.png)
-
-#### Focus Heatmap
-
-Laplacian variance per well (computed on uint8-normalized images). Low values flag out-of-focus wells that may need to be excluded from downstream analysis.
-
-![Focus Heatmap](docs/images/focus_heatmap.png)
+| Intensity Heatmap | Focus Heatmap |
+|---|---|
+| ![Intensity Heatmap](docs/images/intensity_heatmap.png) | ![Focus Heatmap](docs/images/focus_heatmap.png) |
+| Mean pixel intensity per well. Reveals systematic patterns such as edge effects or dispensing artifacts. | Laplacian variance per well (uint8-normalized). Low values flag out-of-focus wells to exclude from analysis. |
 
 5. Click **Save All Plots** to export all plots as PNGs to `<plate_folder>/PlateViewer/`
 
