@@ -40,14 +40,17 @@ def make_plate_heatmap_figure(heatmap, title="", plate_rows=16, plate_cols=24):
         colorscale='Viridis',
         hoverongaps=False,
         hovertemplate='Well: %{y}%{x}<br>Value: %{z:.1f}<extra></extra>',
+        xgap=1, ygap=1,
     ))
     fig.update_layout(
         title=title,
-        yaxis=dict(autorange='reversed', scaleanchor='x', dtick=1),
-        xaxis=dict(side='top', dtick=1),
+        yaxis=dict(autorange='reversed', scaleanchor='x', dtick=1,
+                   constrain='domain'),
+        xaxis=dict(side='top', dtick=1, constrain='domain'),
         width=900,
         height=500,
         margin=dict(l=40, r=40, t=60, b=20),
+        plot_bgcolor='white',
     )
     return fig
 
