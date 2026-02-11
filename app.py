@@ -96,7 +96,8 @@ app.layout = html.Div([
                   style={'color': '#888', 'fontSize': '12px'}),
         html.Button("Save All Plots", id='btn-save-all', n_clicks=0,
                     style={'marginLeft': 'auto'}),
-        html.Span(id='save-all-status', style={'color': '#666'}),
+        dcc.Loading(html.Span(id='save-all-status', style={'color': '#666'}),
+                    type='dot'),
     ], style={'margin': '10px', 'display': 'flex', 'alignItems': 'center', 'gap': '10px'}),
 
     # -- Tabs --
@@ -382,8 +383,10 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
     out_dir = os.path.join(folder, "PlateViewer")
     os.makedirs(out_dir, exist_ok=True)
     saved = []
+    print(f"[Save All] Saving plots to {out_dir}/ ...")
 
     # 1. Random montage
+    print("[Save All] 1/5 Generating random montage...")
     images = find_images(folder, channel=channel)
     if len(images) >= 32:
         montage, _ = make_montage(images, n_images=32, rows=4, cols=8, crop_size=1020)
@@ -392,6 +395,7 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
         saved.append("montage")
 
     # 2. Control montage (only if well spec provided)
+    print("[Save All] 2/5 Generating control montage...")
     if well_spec:
         well_set = parse_well_spec(well_spec, plate_rows=plate_rows)
         if well_set:
@@ -403,6 +407,7 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
                 saved.append("controls")
 
     # 3. Plate thumbnails
+    print("[Save All] 3/5 Generating plate thumbnails...")
     fields = detect_fields(folder)
     pref_field = center_field(fields)
     thumb_size, spacing = 128, 2
@@ -448,6 +453,7 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
     saved.append("thumbnails")
 
     # 4. Intensity heatmap
+    print("[Save All] 4/5 Computing intensity heatmap...")
     heatmap_int = compute_intensity_heatmap(folder, channel, plate_rows, plate_cols)
     fig_int = make_plate_heatmap_figure(heatmap_int, title=f"Mean Intensity — {channel}",
                                         plate_rows=plate_rows, plate_cols=plate_cols)
@@ -456,6 +462,7 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
     saved.append("intensity")
 
     # 5. Focus heatmap
+    print("[Save All] 5/5 Computing focus heatmap...")
     heatmap_foc = compute_focus_heatmap(folder, channel, plate_rows, plate_cols)
     fig_foc = make_plate_heatmap_figure(heatmap_foc, title=f"Focus (Laplacian variance) — {channel}",
                                         plate_rows=plate_rows, plate_cols=plate_cols)
@@ -463,6 +470,7 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
     fig_foc.write_image(path, scale=2)
     saved.append("focus")
 
+    print(f"[Save All] Done — saved {len(saved)} plots.")
     return f"Saved {len(saved)} plots to {out_dir}/: {', '.join(saved)}"
 
 
