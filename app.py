@@ -8,144 +8,21 @@ Usage:
 """
 
 import argparse
-import base64
-import concurrent.futures
-import io
-import os
-import re
 import glob
+import os
 
-import numpy as np
-from PIL import Image
-import tifffile
 import dash
 from dash import html, dcc, Input, Output, State, callback
 import plotly.graph_objects as go
 
-from montage import find_images, make_montage, uint16_to_uint8, parse_filename
+from plate import find_images, detect_channels
+from image import numpy_to_b64png
+from montage import make_montage
+from heatmaps import compute_intensity_heatmap, compute_focus_heatmap
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Plotly figure helper
 # ---------------------------------------------------------------------------
-
-def detect_channels(plate_folder):
-    """Scan filenames in a plate folder and return the list of channel names."""
-    tifs = glob.glob(os.path.join(plate_folder, "*.tif"))
-    channels = set()
-    for f in tifs[:200]:  # sample first 200 files for speed
-        m = re.search(r'wv\s+\d+\s*-\s*(\w+)', os.path.basename(f))
-        if m:
-            channels.add(m.group(1))
-    return sorted(channels)
-
-
-def detect_wells(plate_folder):
-    """Scan filenames and return sorted list of unique well IDs (e.g. 'A01')."""
-    tifs = glob.glob(os.path.join(plate_folder, "*.tif"))
-    wells = set()
-    for f in tifs:
-        m = re.match(r'^([A-P])\s*-\s*(\d+)\(', os.path.basename(f))
-        if m:
-            wells.add(f"{m.group(1)}{m.group(2).zfill(2)}")
-    return sorted(wells)
-
-
-def numpy_to_b64png(arr):
-    """Convert a uint8 numpy array to a base64-encoded PNG string for Dash."""
-    img = Image.fromarray(arr, mode='L')
-    buf = io.BytesIO()
-    img.save(buf, format='PNG')
-    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
-
-
-def well_to_row_col(well_id):
-    """Convert 'A01' -> (0, 0), 'P24' -> (15, 23)."""
-    row = ord(well_id[0]) - ord('A')
-    col = int(well_id[1:]) - 1
-    return row, col
-
-
-N_WORKERS = 8  # threads for parallel image reading
-
-
-def _parse_well_from_path(fpath):
-    """Extract well ID from filepath, or None."""
-    m = re.match(r'^([A-P])\s*-\s*(\d+)\(', os.path.basename(fpath))
-    if m:
-        return f"{m.group(1)}{m.group(2).zfill(2)}"
-    return None
-
-
-def _read_and_mean(fpath):
-    """Read a TIF, subsample 2x, return (well_id, mean_intensity)."""
-    well = _parse_well_from_path(fpath)
-    if well is None:
-        return None
-    img = tifffile.imread(fpath)[::2, ::2]
-    return (well, float(np.mean(img)))
-
-
-def _read_and_focus(fpath):
-    """Read a TIF, subsample 2x, return (well_id, laplacian_variance)."""
-    from scipy.ndimage import laplace
-    well = _parse_well_from_path(fpath)
-    if well is None:
-        return None
-    img = tifffile.imread(fpath)[::2, ::2].astype(np.float32)
-    lap = laplace(img)
-    return (well, float(np.var(lap)))
-
-
-def _aggregate_to_heatmap(results):
-    """Take list of (well_id, value) tuples and return a 16x24 array."""
-    well_values = {}
-    for item in results:
-        if item is None:
-            continue
-        well, val = item
-        well_values.setdefault(well, []).append(val)
-    heatmap = np.full((16, 24), np.nan)
-    for well, vals in well_values.items():
-        r, c = well_to_row_col(well)
-        heatmap[r, c] = np.mean(vals)
-    return heatmap
-
-
-def _cache_path(plate_folder, channel, metric):
-    """Return path for a cached heatmap .npy file."""
-    plate_name = os.path.basename(os.path.normpath(plate_folder))
-    return os.path.join(plate_folder, f".plateviewer_{plate_name}_{channel}_{metric}.npy")
-
-
-def compute_intensity_heatmap(plate_folder, channel):
-    """Compute mean intensity per well for a given channel. Returns a 16x24 array."""
-    cache = _cache_path(plate_folder, channel, "intensity")
-    if os.path.exists(cache):
-        print(f"  Loading cached intensity heatmap: {cache}")
-        return np.load(cache)
-    images = find_images(plate_folder, channel=channel)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=N_WORKERS) as pool:
-        results = list(pool.map(_read_and_mean, images))
-    heatmap = _aggregate_to_heatmap(results)
-    np.save(cache, heatmap)
-    print(f"  Cached intensity heatmap: {cache}")
-    return heatmap
-
-
-def compute_focus_heatmap(plate_folder, channel):
-    """Compute Laplacian variance (focus metric) per well. Returns a 16x24 array."""
-    cache = _cache_path(plate_folder, channel, "focus")
-    if os.path.exists(cache):
-        print(f"  Loading cached focus heatmap: {cache}")
-        return np.load(cache)
-    images = find_images(plate_folder, channel=channel)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=N_WORKERS) as pool:
-        results = list(pool.map(_read_and_focus, images))
-    heatmap = _aggregate_to_heatmap(results)
-    np.save(cache, heatmap)
-    print(f"  Cached focus heatmap: {cache}")
-    return heatmap
-
 
 def make_plate_heatmap_figure(heatmap, title=""):
     """Create a Plotly heatmap figure shaped as a 384-well plate."""
@@ -195,7 +72,7 @@ app.layout = html.Div([
         dcc.Dropdown(id='channel-dropdown', style={'width': '200px', 'display': 'inline-block'}),
     ], style={'margin': '10px'}),
 
-    # -- Tabs for different views --
+    # -- Tabs --
     dcc.Tabs(id='tabs', value='tab-montage', children=[
         dcc.Tab(label='Random Montage', value='tab-montage'),
         dcc.Tab(label='Intensity Heatmap', value='tab-intensity'),
@@ -204,12 +81,15 @@ app.layout = html.Div([
 
     html.Div(id='tab-content', style={'margin': '10px'}),
 
-    # -- Hidden store for state --
+    # -- Hidden store --
     dcc.Store(id='plate-folder-store'),
 ], style={'fontFamily': 'sans-serif', 'maxWidth': '1200px', 'margin': '0 auto'})
 
 
-# -- Load plate folder --
+# ---------------------------------------------------------------------------
+# Callbacks
+# ---------------------------------------------------------------------------
+
 @callback(
     Output('channel-dropdown', 'options'),
     Output('channel-dropdown', 'value'),
@@ -230,7 +110,6 @@ def load_plate(n_clicks, folder):
     return options, channels[0], f"Loaded: {len(tifs)} images, {len(channels)} channels.", folder
 
 
-# -- Render active tab --
 @callback(
     Output('tab-content', 'children'),
     Input('tabs', 'value'),
@@ -263,7 +142,6 @@ def render_tab(tab, channel, folder):
     return html.Div()
 
 
-# -- Generate montage --
 @callback(
     Output('montage-output', 'children'),
     Input('btn-montage', 'n_clicks'),
@@ -285,7 +163,6 @@ def generate_montage(n_clicks, channel, folder):
     ])
 
 
-# -- Intensity heatmap --
 @callback(
     Output('intensity-output', 'children'),
     Input('btn-intensity', 'n_clicks'),
@@ -297,11 +174,10 @@ def generate_intensity_heatmap(n_clicks, channel, folder):
     if not folder or not channel:
         return html.Div("Load a plate folder first.")
     heatmap = compute_intensity_heatmap(folder, channel)
-    fig = make_plate_heatmap_figure(heatmap, title=f"Median Intensity — {channel}")
+    fig = make_plate_heatmap_figure(heatmap, title=f"Mean Intensity — {channel}")
     return dcc.Graph(figure=fig)
 
 
-# -- Focus heatmap --
 @callback(
     Output('focus-output', 'children'),
     Input('btn-focus', 'n_clicks'),
@@ -322,8 +198,10 @@ def generate_focus_heatmap(n_clicks, channel, folder):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    import webbrowser, threading
     parser = argparse.ArgumentParser(description="PlateViewer web interface")
     parser.add_argument("--port", type=int, default=8050, help="Port (default: 8050)")
     parser.add_argument("--debug", action="store_true", help="Enable Dash debug mode")
     args = parser.parse_args()
+    threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{args.port}")).start()
     app.run(debug=args.debug, port=args.port)

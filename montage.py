@@ -2,78 +2,19 @@
 """
 Generate a random montage of images from a high-content screening plate folder.
 
-Randomly selects N images (default 32) from a plate folder and assembles them
-into a montage TIF (4 rows x 8 columns). Images are converted to uint8 on load
-to save memory. Output is uint8 TIF.
-
 Usage:
     conda run -n PlateViewer python montage.py /path/to/plate_folder
     conda run -n PlateViewer python montage.py /path/to/plate_folder --channel Blue --n_images 64 --rows 8 --cols 8
 """
 
 import argparse
-import glob
-import os
-import re
 import sys
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
 import tifffile
 
-
-def uint16_to_uint8(img, plow=1, phigh=99):
-    """Convert a uint16 image to uint8 using percentile contrast stretch."""
-    img = img.astype(np.float32)
-    lo = np.percentile(img, plow)
-    hi = np.percentile(img, phigh)
-    if hi > lo:
-        img = np.clip((img - lo) / (hi - lo) * 255.0, 0, 255)
-    else:
-        img = np.zeros_like(img)
-    return img.astype(np.uint8)
-
-
-def parse_filename(filepath):
-    """Extract well and field info from a filename like 'A - 01(fld 1 wv 390 - Blue).tif'."""
-    basename = os.path.basename(filepath)
-    m = re.match(r'^([A-P])\s*-\s*(\d+)\(fld\s+(\d+)\s+wv\s+.+\)\.tif$', basename)
-    if m:
-        row, col, fld = m.group(1), m.group(2), m.group(3)
-        return f"{row}{col} f{fld}"
-    return ""
-
-
-def burn_label(tile, label, font_size=48):
-    """Burn a text label onto the top-center of a uint8 tile."""
-    img_pil = Image.fromarray(tile, mode='L')
-    draw = ImageDraw.Draw(img_pil)
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
-    except (IOError, OSError):
-        font = ImageFont.load_default()
-    bbox = draw.textbbox((0, 0), label, font=font)
-    text_w = bbox[2] - bbox[0]
-    x = (tile.shape[1] - text_w) // 2
-    y = 5
-    # draw dark outline then white text for contrast
-    for dx in (-1, 0, 1):
-        for dy in (-1, 0, 1):
-            draw.text((x + dx, y + dy), label, fill=0, font=font)
-    draw.text((x, y), label, fill=255, font=font)
-    return np.array(img_pil)
-
-
-def find_images(plate_folder, channel=None):
-    """Find all TIF images in a plate folder, optionally filtered by channel.
-
-    Excludes any files inside 'output*' subdirectories.
-    """
-    all_tifs = glob.glob(os.path.join(plate_folder, "*.tif"))
-    if channel:
-        all_tifs = [f for f in all_tifs if channel in os.path.basename(f)]
-    all_tifs.sort()
-    return all_tifs
+from plate import find_images, parse_filename
+from image import uint16_to_uint8, burn_label
 
 
 def make_montage(image_list, n_images=32, rows=4, cols=8, crop_size=512, spacing=5):
@@ -106,7 +47,6 @@ def make_montage(image_list, n_images=32, rows=4, cols=8, crop_size=512, spacing
     if len(image_list) < n_images:
         print(f"WARNING: Only {len(image_list)} images available, need {n_images}. Using all.")
         n_images = len(image_list)
-        # adjust grid to fit
         cols = min(cols, n_images)
         rows = int(np.ceil(n_images / cols))
 
@@ -120,11 +60,9 @@ def make_montage(image_list, n_images=32, rows=4, cols=8, crop_size=512, spacing
         if img.dtype != np.uint8:
             img = uint16_to_uint8(img)
         h, w = img.shape[:2]
-        # center crop
         y0 = max(0, (h - crop_size) // 2)
         x0 = max(0, (w - crop_size) // 2)
         tile = img[y0:y0 + crop_size, x0:x0 + crop_size]
-        # pad if image is smaller than crop_size
         if tile.shape[0] < crop_size or tile.shape[1] < crop_size:
             padded = np.zeros((crop_size, crop_size), dtype=np.uint8)
             padded[:tile.shape[0], :tile.shape[1]] = tile
@@ -150,6 +88,7 @@ def make_montage(image_list, n_images=32, rows=4, cols=8, crop_size=512, spacing
 
 
 def main():
+    import os
     parser = argparse.ArgumentParser(description="Generate a random image montage from a plate folder.")
     parser.add_argument("plate_folder", help="Path to the plate folder containing TIF images.")
     parser.add_argument("-c", "--channel", default=None,
@@ -177,11 +116,7 @@ def main():
           (f" (channel: {args.channel})" if args.channel else ""))
 
     montage, selected = make_montage(
-        images,
-        n_images=args.n_images,
-        rows=args.rows,
-        cols=args.cols,
-        crop_size=args.crop_size,
+        images, n_images=args.n_images, rows=args.rows, cols=args.cols, crop_size=args.crop_size,
     )
 
     if args.output:
