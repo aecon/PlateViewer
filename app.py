@@ -16,6 +16,8 @@ import dash
 from dash import html, dcc, Input, Output, State, callback
 import plotly.graph_objects as go
 
+from PIL import Image
+
 from plate import (find_images, detect_channels, detect_fields, center_field,
                    parse_well_spec, filter_images_by_wells, PLATE_FORMATS)
 from image import numpy_to_b64png
@@ -83,6 +85,13 @@ app.layout = html.Div([
             clearable=False,
         ),
     ], style={'margin': '10px', 'display': 'flex', 'alignItems': 'center', 'gap': '10px'}),
+
+    # -- Save All button --
+    html.Div([
+        html.Button("Save All Plots", id='btn-save-all', n_clicks=0,
+                    style={'marginRight': '10px'}),
+        html.Span(id='save-all-status', style={'color': '#666'}),
+    ], style={'margin': '10px'}),
 
     # -- Tabs --
     dcc.Tabs(id='tabs', value='tab-montage', children=[
@@ -353,6 +362,107 @@ def generate_contact_sheet(n_clicks, channel, folder, plate_fmt):
         plot_bgcolor='black',
     )
     return dcc.Graph(figure=fig, style={'width': '100%'}, config={'responsive': True})
+
+
+@callback(
+    Output('save-all-status', 'children'),
+    Input('btn-save-all', 'n_clicks'),
+    State('channel-dropdown', 'value'),
+    State('plate-folder-store', 'data'),
+    State('plate-format-dropdown', 'value'),
+    State('control-wells-input', 'value'),
+    prevent_initial_call=True,
+)
+def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
+    if not folder or not channel:
+        return "Load a plate folder first."
+
+    plate_rows, plate_cols = PLATE_FORMATS[plate_fmt]
+    out_dir = os.path.join(folder, "PlateViewer")
+    os.makedirs(out_dir, exist_ok=True)
+    saved = []
+
+    # 1. Random montage
+    images = find_images(folder, channel=channel)
+    if len(images) >= 32:
+        montage, _ = make_montage(images, n_images=32, rows=4, cols=8, crop_size=1020)
+        path = os.path.join(out_dir, f"{channel}_montage.png")
+        Image.fromarray(montage).save(path)
+        saved.append("montage")
+
+    # 2. Control montage (only if well spec provided)
+    if well_spec:
+        well_set = parse_well_spec(well_spec, plate_rows=plate_rows)
+        if well_set:
+            filtered = filter_images_by_wells(images, well_set)
+            if len(filtered) >= 32:
+                ctrl_montage, _ = make_montage(filtered, n_images=32, rows=4, cols=8, crop_size=1020)
+                path = os.path.join(out_dir, f"{channel}_controls.png")
+                Image.fromarray(ctrl_montage).save(path)
+                saved.append("controls")
+
+    # 3. Plate thumbnails
+    fields = detect_fields(folder)
+    pref_field = center_field(fields)
+    thumb_size, spacing = 128, 2
+    sheet, well_positions = make_contact_sheet(
+        images, thumb_size=thumb_size, spacing=spacing,
+        plate_rows=plate_rows, plate_cols=plate_cols,
+        preferred_field=pref_field,
+    )
+    # Build the same Plotly figure as the contact sheet tab
+    b64 = numpy_to_b64png(sheet)
+    h, w = sheet.shape
+    step = thumb_size + spacing
+    col_tick_vals = [i * step + thumb_size // 2 for i in range(plate_cols)]
+    col_tick_labels = [str(i + 1) for i in range(plate_cols)]
+    row_tick_vals = [i * step + thumb_size // 2 for i in range(plate_rows)]
+    row_tick_labels = [chr(ord('A') + i) for i in range(plate_rows)]
+    fig_contact = go.Figure()
+    fig_contact.add_layout_image(
+        source=b64, xref="x", yref="y",
+        x=0, y=0, sizex=w, sizey=h,
+        sizing="stretch", layer="below",
+    )
+    fig_contact.update_xaxes(
+        range=[0, w], side='top',
+        tickvals=col_tick_vals, ticktext=col_tick_labels,
+        tickfont=dict(size=11), showgrid=False, zeroline=False,
+    )
+    fig_contact.update_yaxes(
+        range=[h, 0],
+        tickvals=row_tick_vals, ticktext=row_tick_labels,
+        tickfont=dict(size=11), showgrid=False, zeroline=False,
+        scaleanchor='x',
+    )
+    n_fields = len(fields) if fields else '?'
+    fig_contact.update_layout(
+        width=1150, height=int(1150 * h / w) + 60,
+        margin=dict(l=20, r=10, t=50, b=10),
+        title=f"Plate Thumbnails — field {pref_field} per well ({n_fields} fields, {channel})",
+        showlegend=False, plot_bgcolor='black',
+    )
+    path = os.path.join(out_dir, f"{channel}_thumbnails.png")
+    fig_contact.write_image(path, scale=2)
+    saved.append("thumbnails")
+
+    # 4. Intensity heatmap
+    heatmap_int = compute_intensity_heatmap(folder, channel, plate_rows, plate_cols)
+    fig_int = make_plate_heatmap_figure(heatmap_int, title=f"Mean Intensity — {channel}",
+                                        plate_rows=plate_rows, plate_cols=plate_cols)
+    path = os.path.join(out_dir, f"{channel}_intensity.png")
+    fig_int.write_image(path, scale=2)
+    saved.append("intensity")
+
+    # 5. Focus heatmap
+    heatmap_foc = compute_focus_heatmap(folder, channel, plate_rows, plate_cols)
+    fig_foc = make_plate_heatmap_figure(heatmap_foc, title=f"Focus (Laplacian variance) — {channel}",
+                                        plate_rows=plate_rows, plate_cols=plate_cols)
+    path = os.path.join(out_dir, f"{channel}_focus.png")
+    fig_foc.write_image(path, scale=2)
+    saved.append("focus")
+
+    return f"Saved {len(saved)} plots to {out_dir}/: {', '.join(saved)}"
 
 
 # ---------------------------------------------------------------------------
