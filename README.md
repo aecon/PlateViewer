@@ -2,7 +2,7 @@
 
 Quality control visualization tools for arrayed high-content screening experiments (384-well and 96-well plates).
 
-## Setup
+## Install dependencies
 
 ```bash
 conda create -n PlateViewer python=3.11 -y
