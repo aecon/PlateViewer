@@ -15,7 +15,7 @@ conda run -n PlateViewer pip install numpy scikit-image tifffile dash plotly pil
 conda run -n PlateViewer python app.py
 ```
 
-Open http://localhost:8050 in a browser. Use `--port 8051` to change the port.
+The browser opens automatically. Use `--port 8051` to change the port.
 
 1. Enter the plate folder path and click **Load**
 2. Select a channel from the dropdown
@@ -42,6 +42,16 @@ Options:
 | `--cols` | 8 | Montage grid columns |
 | `--crop_size` | 1020 | Center crop size in pixels |
 | `-o, --output` | auto | Output TIF path |
+
+## Project Structure
+
+```
+plate.py        — Plate-level logic: file discovery, filename parsing, well utilities
+image.py        — Image utilities: uint8 conversion, label burning, PNG encoding
+montage.py      — Montage assembly + CLI entry point
+heatmaps.py     — Plate heatmap computation (threaded I/O, disk caching)
+app.py          — Dash web UI (thin, imports from above modules)
+```
 
 ## Expected File Naming
 
