@@ -17,12 +17,28 @@ conda run -n PlateViewer python app.py
 
 The browser opens automatically. Use `--port 8051` to change the port.
 
-1. Enter the plate folder path and click **Load**
+1. Enter the plate folder path (or click **Browse**) and click **Load**
 2. Select a channel from the dropdown
 3. Use the tabs:
    - **Random Montage** — 4x8 grid of randomly sampled images with well/field labels
+   - **Control Montage** — 4x8 grid sampled from user-specified control wells
+   - **Plate Thumbnails** — 16x24 overview with one thumbnail per well (hover for well ID)
    - **Intensity Heatmap** — mean pixel intensity per well (16x24 plate layout)
    - **Focus Heatmap** — Laplacian variance per well to detect out-of-focus fields
+
+### Control well syntax
+
+The Control Montage tab accepts a flexible well specification, for example:
+
+| Format | Meaning |
+|--------|---------|
+| `A-H:5` | Rows A through H, column 5 |
+| `I-P:13` | Rows I through P, column 13 |
+| `col:1-2` | All rows, columns 1 and 2 |
+| `A01` | Single well |
+| `A01-A09` | Well range within a row |
+
+Combine with commas: `A-H:5, I-P:13`
 
 Heatmap results are cached as `.npy` files in the plate folder. Delete them to force recomputation.
 
