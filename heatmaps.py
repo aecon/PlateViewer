@@ -7,6 +7,7 @@ import numpy as np
 import tifffile
 
 from plate import find_images, parse_well, well_to_row_col
+from image import uint16_to_uint8
 
 N_WORKERS = 8
 
@@ -25,13 +26,15 @@ def _read_and_mean(fpath):
 
 
 def _read_and_focus(fpath):
-    """Read a TIF, subsample 2x, return (well_id, laplacian_variance)."""
+    """Read a TIF, subsample 2x, convert to uint8, return (well_id, laplacian_variance)."""
     from scipy.ndimage import laplace
     well = parse_well(fpath)
     if well is None:
         return None
-    img = tifffile.imread(fpath)[::2, ::2].astype(np.float32)
-    lap = laplace(img)
+    img = tifffile.imread(fpath)[::2, ::2]
+    if img.dtype != np.uint8:
+        img = uint16_to_uint8(img)
+    lap = laplace(img.astype(np.float32))
     return (well, float(np.var(lap)))
 
 
