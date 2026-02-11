@@ -113,13 +113,19 @@ app.layout = html.Div([
 
     # -- Tab panels (all rendered, visibility toggled) --
     html.Div(id='panel-montage', style={'margin': '10px'}, children=[
-        html.Button("Generate Montage", id='btn-montage', n_clicks=0,
-                    style={'margin': '10px 0'}),
+        html.Div([
+            html.Button("Generate Montage", id='btn-montage', n_clicks=0),
+            html.Button("Save", id='btn-save-montage', n_clicks=0, style={'marginLeft': '10px'}),
+            html.Span(id='save-montage-status', style={'color': '#666', 'marginLeft': '10px'}),
+        ], style={'margin': '10px 0'}),
         dcc.Loading(html.Div(id='montage-output')),
     ]),
     html.Div(id='panel-controls', style={'margin': '10px', 'display': 'none'}, children=[
-        html.Button("Generate Control Montage", id='btn-controls', n_clicks=0,
-                    style={'margin': '10px 0'}),
+        html.Div([
+            html.Button("Generate Control Montage", id='btn-controls', n_clicks=0),
+            html.Button("Save", id='btn-save-controls', n_clicks=0, style={'marginLeft': '10px'}),
+            html.Span(id='save-controls-status', style={'color': '#666', 'marginLeft': '10px'}),
+        ], style={'margin': '10px 0'}),
         dcc.Loading(html.Div(id='controls-output')),
     ]),
     html.Div(id='panel-well', style={'margin': '10px', 'display': 'none'}, children=[
@@ -128,6 +134,8 @@ app.layout = html.Div([
             dcc.Input(id='well-id-input', type='text', placeholder='e.g. A05',
                       style={'width': '100px', 'marginRight': '10px'}),
             html.Button("Generate", id='btn-well', n_clicks=0),
+            html.Button("Save", id='btn-save-well', n_clicks=0, style={'marginLeft': '10px'}),
+            html.Span(id='save-well-status', style={'color': '#666', 'marginLeft': '10px'}),
         ], style={'margin': '10px 0'}),
         dcc.Loading(html.Div(id='well-output')),
     ]),
@@ -333,6 +341,89 @@ def generate_well_montage(n_clicks, well_id, channel, folder):
         html.P(f"Well {well_id} — {len(filtered)} fields ({channel} channel)"),
         html.Img(src=b64, style={'width': '100%', 'imageRendering': 'auto'}),
     ])
+
+
+# -- Save individual montage callbacks --
+
+@callback(
+    Output('save-montage-status', 'children'),
+    Input('btn-save-montage', 'n_clicks'),
+    State('channel-dropdown', 'value'),
+    State('plate-folder-store', 'data'),
+    prevent_initial_call=True,
+)
+def save_montage(n_clicks, channel, folder):
+    if not folder or not channel:
+        return "Load a plate folder first."
+    images = find_images(folder, channel=channel)
+    if len(images) < 32:
+        return f"Not enough images ({len(images)})."
+    out_dir = os.path.join(folder, "PlateViewer")
+    os.makedirs(out_dir, exist_ok=True)
+    montage, _ = make_montage(images, n_images=32, rows=4, cols=8, crop_size=1020)
+    path = os.path.join(out_dir, f"{channel}_montage.png")
+    Image.fromarray(montage).save(path)
+    return f"Saved: {path}"
+
+
+@callback(
+    Output('save-controls-status', 'children'),
+    Input('btn-save-controls', 'n_clicks'),
+    State('control-wells-input', 'value'),
+    State('channel-dropdown', 'value'),
+    State('plate-folder-store', 'data'),
+    State('plate-format-dropdown', 'value'),
+    prevent_initial_call=True,
+)
+def save_controls_montage(n_clicks, well_spec, channel, folder, plate_fmt):
+    if not folder or not channel:
+        return "Load a plate folder first."
+    if not well_spec:
+        return "Enter control well specification."
+    plate_rows, _ = PLATE_FORMATS[plate_fmt]
+    well_set = parse_well_spec(well_spec, plate_rows=plate_rows)
+    if not well_set:
+        return "Could not parse well specification."
+    images = find_images(folder, channel=channel)
+    filtered = filter_images_by_wells(images, well_set)
+    if len(filtered) < 32:
+        return f"Not enough control images ({len(filtered)})."
+    out_dir = os.path.join(folder, "PlateViewer")
+    os.makedirs(out_dir, exist_ok=True)
+    montage, _ = make_montage(filtered, n_images=32, rows=4, cols=8, crop_size=1020)
+    path = os.path.join(out_dir, f"{channel}_controls.png")
+    Image.fromarray(montage).save(path)
+    return f"Saved: {path}"
+
+
+@callback(
+    Output('save-well-status', 'children'),
+    Input('btn-save-well', 'n_clicks'),
+    State('well-id-input', 'value'),
+    State('channel-dropdown', 'value'),
+    State('plate-folder-store', 'data'),
+    prevent_initial_call=True,
+)
+def save_well_montage(n_clicks, well_id, channel, folder):
+    if not folder or not channel:
+        return "Load a plate folder first."
+    if not well_id or not re.match(r'^[A-P]\d+$', well_id.strip(), re.IGNORECASE):
+        return "Enter a valid well ID."
+    well_id = f"{well_id[0].upper()}{int(well_id[1:]):02d}"
+    images = find_images(folder, channel=channel)
+    filtered = filter_images_by_wells(images, {well_id})
+    if not filtered:
+        return f"No images for well {well_id}."
+    def field_key(fpath):
+        m = re.search(r'fld\s+(\d+)', os.path.basename(fpath))
+        return int(m.group(1)) if m else 0
+    filtered.sort(key=field_key)
+    out_dir = os.path.join(folder, "PlateViewer")
+    os.makedirs(out_dir, exist_ok=True)
+    montage = make_well_montage(filtered, spacing=5)
+    path = os.path.join(out_dir, f"{channel}_well_{well_id}.png")
+    Image.fromarray(montage).save(path)
+    return f"Saved: {path}"
 
 
 @callback(
