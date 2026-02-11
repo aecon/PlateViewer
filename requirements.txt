@@ -1,0 +1,8 @@
+dash==4.0.0
+kaleido==1.2.0
+numpy==2.4.2
+pillow==12.1.1
+plotly==6.5.2
+scikit-image==0.26.0
+scipy==1.17.0
+tifffile==2026.1.28

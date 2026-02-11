@@ -6,7 +6,7 @@ Quality control visualization tools for arrayed high-content screening experimen
 
 ```bash
 conda create -n PlateViewer python=3.11 -y
-conda run -n PlateViewer pip install numpy scikit-image tifffile dash plotly pillow scipy kaleido
+conda run -n PlateViewer pip install -r requirements.txt
 ```
 
 ## Web Interface
