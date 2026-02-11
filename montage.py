@@ -74,7 +74,7 @@ def make_montage(image_list, n_images=32, rows=4, cols=8, crop_size=512, spacing
     # assemble montage
     montage_h = rows * crop_size + (rows - 1) * spacing
     montage_w = cols * crop_size + (cols - 1) * spacing
-    montage = np.zeros((montage_h, montage_w), dtype=np.uint8)
+    montage = np.full((montage_h, montage_w), 255, dtype=np.uint8)
 
     for idx, tile in enumerate(tiles):
         label = parse_filename(selected_files[idx])
