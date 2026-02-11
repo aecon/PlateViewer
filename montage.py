@@ -8,12 +8,14 @@ Usage:
 """
 
 import argparse
+import concurrent.futures
+import os
 import sys
 
 import numpy as np
 import tifffile
 
-from plate import find_images, parse_filename
+from plate import find_images, parse_filename, parse_well
 from image import uint16_to_uint8, burn_label
 
 
@@ -85,6 +87,69 @@ def make_montage(image_list, n_images=32, rows=4, cols=8, crop_size=512, spacing
         montage[y0:y0 + crop_size, x0:x0 + crop_size] = tile
 
     return montage, selected_files
+
+
+def make_contact_sheet(image_list, thumb_size=128, spacing=2, plate_rows=16, plate_cols=24):
+    """Create a plate-layout contact sheet: one thumbnail per well in 16x24 grid.
+
+    Uses the first field found for each well as the representative image.
+
+    Parameters
+    ----------
+    image_list : list of str
+        Paths to TIF images (should be pre-filtered by channel).
+    thumb_size : int
+        Size of each thumbnail (pixels).
+    spacing : int
+        Gap between thumbnails (pixels).
+    plate_rows : int
+        Number of rows in the plate (16 for 384-well).
+    plate_cols : int
+        Number of columns in the plate (24 for 384-well).
+
+    Returns
+    -------
+    sheet : np.ndarray (uint8)
+        The assembled contact sheet.
+    well_positions : dict
+        Mapping of well_id -> (x_center, y_center) in pixel coords of the sheet.
+    """
+    # group images by well, prefer field 5 (center tile)
+    well_images = {}
+    for fpath in image_list:
+        w = parse_well(fpath)
+        if not w:
+            continue
+        basename = os.path.basename(fpath)
+        is_fld5 = 'fld 5' in basename
+        if w not in well_images or is_fld5:
+            well_images[w] = fpath
+
+    sheet_h = plate_rows * thumb_size + (plate_rows - 1) * spacing
+    sheet_w = plate_cols * thumb_size + (plate_cols - 1) * spacing
+    sheet = np.zeros((sheet_h, sheet_w), dtype=np.uint8)
+
+    from skimage.transform import resize
+
+    def _load_thumb(args):
+        well, fpath = args
+        img = tifffile.imread(fpath)
+        if img.dtype != np.uint8:
+            img = uint16_to_uint8(img)
+        return well, resize(img, (thumb_size, thumb_size), preserve_range=True, anti_aliasing=True).astype(np.uint8)
+
+    well_positions = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        results = pool.map(_load_thumb, well_images.items())
+        for well, thumb in results:
+            row = ord(well[0]) - ord('A')
+            col = int(well[1:]) - 1
+            y0 = row * (thumb_size + spacing)
+            x0 = col * (thumb_size + spacing)
+            sheet[y0:y0 + thumb_size, x0:x0 + thumb_size] = thumb
+            well_positions[well] = (x0 + thumb_size // 2, y0 + thumb_size // 2)
+
+    return sheet, well_positions
 
 
 def main():

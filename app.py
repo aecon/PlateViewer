@@ -9,15 +9,16 @@ Usage:
 
 import argparse
 import glob
+import math
 import os
 
 import dash
 from dash import html, dcc, Input, Output, State, callback
 import plotly.graph_objects as go
 
-from plate import find_images, detect_channels
+from plate import find_images, detect_channels, parse_well_spec, filter_images_by_wells
 from image import numpy_to_b64png
-from montage import make_montage
+from montage import make_montage, make_contact_sheet
 from heatmaps import compute_intensity_heatmap, compute_focus_heatmap
 
 # ---------------------------------------------------------------------------
@@ -76,6 +77,8 @@ app.layout = html.Div([
     # -- Tabs --
     dcc.Tabs(id='tabs', value='tab-montage', children=[
         dcc.Tab(label='Random Montage', value='tab-montage'),
+        dcc.Tab(label='Control Montage', value='tab-controls'),
+        dcc.Tab(label='Plate Thumbnails', value='tab-contact'),
         dcc.Tab(label='Intensity Heatmap', value='tab-intensity'),
         dcc.Tab(label='Focus Heatmap', value='tab-focus'),
     ]),
@@ -85,6 +88,23 @@ app.layout = html.Div([
         html.Button("Generate Montage", id='btn-montage', n_clicks=0,
                     style={'margin': '10px 0'}),
         dcc.Loading(html.Div(id='montage-output')),
+    ]),
+    html.Div(id='panel-controls', style={'margin': '10px', 'display': 'none'}, children=[
+        html.Div([
+            html.Label("Control wells: "),
+            dcc.Input(id='control-wells-input', type='text',
+                      placeholder='e.g. A-H:5, I-P:13',
+                      style={'width': '400px', 'marginRight': '10px'}),
+            html.Button("Generate", id='btn-controls', n_clicks=0),
+        ], style={'margin': '10px 0'}),
+        html.P("Syntax: A-H:5 (rows A-H col 5), col:1-2 (full columns), A05 (single well)",
+               style={'color': '#888', 'fontSize': '12px'}),
+        dcc.Loading(html.Div(id='controls-output')),
+    ]),
+    html.Div(id='panel-contact', style={'margin': '10px', 'display': 'none'}, children=[
+        html.Button("Generate Plate Thumbnails", id='btn-contact', n_clicks=0,
+                    style={'margin': '10px 0'}),
+        dcc.Loading(html.Div(id='contact-output')),
     ]),
     html.Div(id='panel-intensity', style={'margin': '10px', 'display': 'none'}, children=[
         html.Button("Compute Intensity Heatmap", id='btn-intensity', n_clicks=0,
@@ -144,14 +164,19 @@ def load_plate(n_clicks, folder):
 
 @callback(
     Output('panel-montage', 'style'),
+    Output('panel-controls', 'style'),
+    Output('panel-contact', 'style'),
     Output('panel-intensity', 'style'),
     Output('panel-focus', 'style'),
     Input('tabs', 'value'),
 )
 def toggle_tab_visibility(tab):
-    styles = [{'margin': '10px', 'display': 'none'} for _ in range(3)]
-    idx = {'tab-montage': 0, 'tab-intensity': 1, 'tab-focus': 2}.get(tab, 0)
-    styles[idx] = {'margin': '10px', 'display': 'block'}
+    hidden = {'margin': '10px', 'display': 'none'}
+    visible = {'margin': '10px', 'display': 'block'}
+    tab_map = {'tab-montage': 0, 'tab-controls': 1, 'tab-contact': 2,
+               'tab-intensity': 3, 'tab-focus': 4}
+    styles = [hidden] * 5
+    styles[tab_map.get(tab, 0)] = visible
     return styles
 
 
@@ -203,6 +228,81 @@ def generate_focus_heatmap(n_clicks, channel, folder):
         return html.Div("Load a plate folder first.")
     heatmap = compute_focus_heatmap(folder, channel)
     fig = make_plate_heatmap_figure(heatmap, title=f"Focus (Laplacian variance) — {channel}")
+    return dcc.Graph(figure=fig)
+
+
+@callback(
+    Output('controls-output', 'children'),
+    Input('btn-controls', 'n_clicks'),
+    State('control-wells-input', 'value'),
+    State('channel-dropdown', 'value'),
+    State('plate-folder-store', 'data'),
+    prevent_initial_call=True,
+)
+def generate_controls_montage(n_clicks, well_spec, channel, folder):
+    if not folder or not channel:
+        return html.Div("Load a plate folder first.")
+    if not well_spec:
+        return html.Div("Enter control well specification.")
+    well_set = parse_well_spec(well_spec)
+    if not well_set:
+        return html.Div(f"Could not parse well specification: {well_spec}")
+    images = find_images(folder, channel=channel)
+    filtered = filter_images_by_wells(images, well_set)
+    if not filtered:
+        return html.Div(f"No images found for wells: {sorted(well_set)}")
+    if len(filtered) < 32:
+        return html.Div(f"Not enough control images ({len(filtered)} found, need 32).")
+    montage, selected = make_montage(filtered, n_images=32, rows=4, cols=8, crop_size=1020)
+    b64 = numpy_to_b64png(montage)
+    return html.Div([
+        html.P(f"Showing 32 random images from {len(filtered)} control images, "
+               f"{len(well_set)} wells ({channel} channel)"),
+        html.Img(src=b64, style={'width': '100%', 'imageRendering': 'auto'}),
+    ])
+
+
+@callback(
+    Output('contact-output', 'children'),
+    Input('btn-contact', 'n_clicks'),
+    State('channel-dropdown', 'value'),
+    State('plate-folder-store', 'data'),
+    prevent_initial_call=True,
+)
+def generate_contact_sheet(n_clicks, channel, folder):
+    if not folder or not channel:
+        return html.Div("Load a plate folder first.")
+    images = find_images(folder, channel=channel)
+    if not images:
+        return html.Div("No images found.")
+    sheet, well_positions = make_contact_sheet(images, thumb_size=128, spacing=2)
+    b64 = numpy_to_b64png(sheet)
+    h, w = sheet.shape
+
+    fig = go.Figure()
+    # display the contact sheet as a background image
+    fig.add_layout_image(
+        source=b64, xref="x", yref="y",
+        x=0, y=0, sizex=w, sizey=h,
+        sizing="stretch", layer="below",
+    )
+    # invisible scatter markers for hover
+    xs = [pos[0] for pos in well_positions.values()]
+    ys = [pos[1] for pos in well_positions.values()]
+    labels = list(well_positions.keys())
+    fig.add_trace(go.Scatter(
+        x=xs, y=ys, mode='markers',
+        marker=dict(size=20, opacity=0),
+        text=labels,
+        hovertemplate='Well: %{text}<extra></extra>',
+    ))
+    fig.update_xaxes(range=[0, w], visible=False, scaleanchor='y')
+    fig.update_yaxes(range=[h, 0], visible=False)
+    fig.update_layout(
+        width=w, height=h,
+        margin=dict(l=0, r=0, t=30, b=0),
+        title=f"Plate Thumbnails — field 5 per well ({channel} channel)",
+    )
     return dcc.Graph(figure=fig)
 
 

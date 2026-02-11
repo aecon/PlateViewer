@@ -61,3 +61,72 @@ def well_to_row_col(well_id):
     row = ord(well_id[0]) - ord('A')
     col = int(well_id[1:]) - 1
     return row, col
+
+
+def parse_well_spec(spec):
+    """Parse a flexible well specification string into a set of well IDs.
+
+    Supported formats (comma-separated, can be mixed):
+        A05         — single well
+        A-H:5       — rows A through H, column 5
+        I-P:13      — rows I through P, column 13
+        col:1-2     — all rows (A-P), columns 1 and 2
+        A01-A09     — well range within a single row
+
+    Example: "A-H:5, I-P:13" -> {'A05','B05',...,'H05','I13','J13',...,'P13'}
+    """
+    wells = set()
+    for part in spec.split(','):
+        part = part.strip()
+        if not part:
+            continue
+
+        # Format: col:N or col:N-M (full columns)
+        m = re.match(r'^col[: ](\d+)(?:-(\d+))?$', part, re.IGNORECASE)
+        if m:
+            c_start = int(m.group(1))
+            c_end = int(m.group(2)) if m.group(2) else c_start
+            for c in range(c_start, c_end + 1):
+                for row_letter in [chr(ord('A') + r) for r in range(16)]:
+                    wells.add(f"{row_letter}{c:02d}")
+            continue
+
+        # Format: A-H:5 (row range : column)
+        m = re.match(r'^([A-P])-([A-P]):(\d+)$', part, re.IGNORECASE)
+        if m:
+            r_start = ord(m.group(1).upper()) - ord('A')
+            r_end = ord(m.group(2).upper()) - ord('A')
+            col = int(m.group(3))
+            for r in range(r_start, r_end + 1):
+                wells.add(f"{chr(ord('A') + r)}{col:02d}")
+            continue
+
+        # Format: A01-A09 (well range in same row)
+        m = re.match(r'^([A-P])(\d+)-([A-P])(\d+)$', part, re.IGNORECASE)
+        if m:
+            r_start = ord(m.group(1).upper()) - ord('A')
+            c_start = int(m.group(2))
+            r_end = ord(m.group(3).upper()) - ord('A')
+            c_end = int(m.group(4))
+            for r in range(r_start, r_end + 1):
+                for c in range(c_start, c_end + 1):
+                    wells.add(f"{chr(ord('A') + r)}{c:02d}")
+            continue
+
+        # Format: A05 (single well)
+        m = re.match(r'^([A-P])(\d+)$', part, re.IGNORECASE)
+        if m:
+            wells.add(f"{m.group(1).upper()}{int(m.group(2)):02d}")
+            continue
+
+    return wells
+
+
+def filter_images_by_wells(image_list, well_set):
+    """Filter an image list to only include images from the specified wells."""
+    filtered = []
+    for fpath in image_list:
+        w = parse_well(fpath)
+        if w and w in well_set:
+            filtered.append(fpath)
+    return filtered
