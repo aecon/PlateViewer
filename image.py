@@ -6,8 +6,10 @@ import io
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+import config as cfg
 
-def uint16_to_uint8(img, plow=1, phigh=99):
+
+def uint16_to_uint8(img, plow=cfg.PERCENTILE_LOW, phigh=cfg.PERCENTILE_HIGH):
     """Convert a uint16 image to uint8 using percentile contrast stretch."""
     img = img.astype(np.float32)
     lo = np.percentile(img, plow)
@@ -24,7 +26,7 @@ def burn_label(tile, label, font_size=48):
     img_pil = Image.fromarray(tile, mode='L')
     draw = ImageDraw.Draw(img_pil)
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
+        font = ImageFont.truetype(cfg.FONT_PATH, font_size) if cfg.FONT_PATH else ImageFont.load_default()
     except (IOError, OSError):
         font = ImageFont.load_default()
     bbox = draw.textbbox((0, 0), label, font=font)

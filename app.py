@@ -9,7 +9,6 @@ Usage:
 
 import argparse
 import glob
-import math
 import os
 import re
 
@@ -19,8 +18,9 @@ import plotly.graph_objects as go
 
 from PIL import Image
 
+import config as cfg
 from plate import (find_images, detect_channels, detect_fields, center_field,
-                   parse_well_spec, filter_images_by_wells, PLATE_FORMATS)
+                   parse_well_spec, filter_images_by_wells, sort_by_field, PLATE_FORMATS)
 from image import numpy_to_b64png
 from montage import make_montage, make_well_montage, make_contact_sheet
 from heatmaps import compute_intensity_heatmap, compute_focus_heatmap
@@ -47,10 +47,63 @@ def make_plate_heatmap_figure(heatmap, title="", plate_rows=16, plate_cols=24):
         yaxis=dict(autorange='reversed', scaleanchor='x', dtick=1,
                    constrain='domain'),
         xaxis=dict(side='top', dtick=1, constrain='domain'),
-        width=900,
-        height=500,
+        width=cfg.HEATMAP_FIG_WIDTH,
+        height=cfg.HEATMAP_FIG_HEIGHT,
         margin=dict(l=40, r=40, t=60, b=20),
         plot_bgcolor='white',
+    )
+    return fig
+
+
+def make_contact_sheet_figure(sheet, well_positions, plate_rows, plate_cols,
+                               channel, n_fields, preferred_field):
+    """Create a Plotly figure overlaying well hover targets on a contact sheet image."""
+    b64 = numpy_to_b64png(sheet)
+    h, w = sheet.shape
+    thumb_size = cfg.CONTACT_THUMB_SIZE
+    spacing = cfg.CONTACT_SPACING
+    step = thumb_size + spacing
+
+    col_tick_vals = [i * step + thumb_size // 2 for i in range(plate_cols)]
+    col_tick_labels = [str(i + 1) for i in range(plate_cols)]
+    row_tick_vals = [i * step + thumb_size // 2 for i in range(plate_rows)]
+    row_tick_labels = [chr(ord('A') + i) for i in range(plate_rows)]
+
+    fig = go.Figure()
+    fig.add_layout_image(
+        source=b64, xref="x", yref="y",
+        x=0, y=0, sizex=w, sizey=h,
+        sizing="stretch", layer="below",
+    )
+    xs = [pos[0] for pos in well_positions.values()]
+    ys = [pos[1] for pos in well_positions.values()]
+    labels = list(well_positions.keys())
+    fig.add_trace(go.Scatter(
+        x=xs, y=ys, mode='markers',
+        marker=dict(size=20, opacity=0),
+        text=labels,
+        hovertemplate='Well: %{text}<extra></extra>',
+    ))
+    fig.update_xaxes(
+        range=[0, w], side='top',
+        tickvals=col_tick_vals, ticktext=col_tick_labels,
+        tickfont=dict(size=11), showgrid=False, zeroline=False,
+        constrain='domain',
+    )
+    fig.update_yaxes(
+        range=[h, 0],
+        tickvals=row_tick_vals, ticktext=row_tick_labels,
+        tickfont=dict(size=11), showgrid=False, zeroline=False,
+        scaleanchor='x', constrain='domain',
+    )
+    fig_width = cfg.CONTACT_FIG_WIDTH
+    fig_height = int(fig_width * h / w) + 60
+    fig.update_layout(
+        width=fig_width, height=fig_height,
+        margin=dict(l=20, r=10, t=50, b=10),
+        title=f"Plate Thumbnails — field {preferred_field} per well ({n_fields} fields detected, {channel} channel)",
+        showlegend=False,
+        plot_bgcolor='black',
     )
     return fig
 
@@ -236,12 +289,12 @@ def generate_montage(n_clicks, channel, folder):
     if not folder or not channel:
         return html.Div("Load a plate folder first.")
     images = find_images(folder, channel=channel)
-    if len(images) < 32:
-        return html.Div(f"Not enough images ({len(images)} found, need 32).")
-    montage, selected = make_montage(images, n_images=32, rows=4, cols=8, crop_size=1020)
+    if len(images) < cfg.MONTAGE_N_IMAGES:
+        return html.Div(f"Not enough images ({len(images)} found, need {cfg.MONTAGE_N_IMAGES}).")
+    montage, selected = make_montage(images, crop_size=cfg.MONTAGE_CROP_SIZE)
     b64 = numpy_to_b64png(montage)
     return html.Div([
-        html.P(f"Showing 32 random images from {len(images)} ({channel} channel)"),
+        html.P(f"Showing {cfg.MONTAGE_N_IMAGES} random images from {len(images)} ({channel} channel)"),
         html.Img(src=b64, style={'width': '100%', 'imageRendering': 'auto'}),
     ])
 
@@ -304,12 +357,12 @@ def generate_controls_montage(n_clicks, well_spec, channel, folder, plate_fmt):
     filtered = filter_images_by_wells(images, well_set)
     if not filtered:
         return html.Div(f"No images found for wells: {sorted(well_set)}")
-    if len(filtered) < 32:
-        return html.Div(f"Not enough control images ({len(filtered)} found, need 32).")
-    montage, selected = make_montage(filtered, n_images=32, rows=4, cols=8, crop_size=1020)
+    if len(filtered) < cfg.MONTAGE_N_IMAGES:
+        return html.Div(f"Not enough control images ({len(filtered)} found, need {cfg.MONTAGE_N_IMAGES}).")
+    montage, selected = make_montage(filtered, crop_size=cfg.MONTAGE_CROP_SIZE)
     b64 = numpy_to_b64png(montage)
     return html.Div([
-        html.P(f"Showing 32 random images from {len(filtered)} control images, "
+        html.P(f"Showing {cfg.MONTAGE_N_IMAGES} random images from {len(filtered)} control images, "
                f"{len(well_set)} wells ({channel} channel)"),
         html.Img(src=b64, style={'width': '100%', 'imageRendering': 'auto'}),
     ])
@@ -333,12 +386,8 @@ def generate_well_montage(n_clicks, well_id, channel, folder):
     filtered = filter_images_by_wells(images, {well_id})
     if not filtered:
         return html.Div(f"No images found for well {well_id}.")
-    # sort by field number
-    def field_key(fpath):
-        m = re.search(r'fld\s+(\d+)', os.path.basename(fpath))
-        return int(m.group(1)) if m else 0
-    filtered.sort(key=field_key)
-    montage = make_well_montage(filtered, spacing=5)
+    sort_by_field(filtered)
+    montage = make_well_montage(filtered)
     b64 = numpy_to_b64png(montage)
     return html.Div([
         html.P(f"Well {well_id} — {len(filtered)} fields ({channel} channel)"),
@@ -359,11 +408,11 @@ def save_montage(n_clicks, channel, folder):
     if not folder or not channel:
         return "Load a plate folder first."
     images = find_images(folder, channel=channel)
-    if len(images) < 32:
+    if len(images) < cfg.MONTAGE_N_IMAGES:
         return f"Not enough images ({len(images)})."
     out_dir = os.path.join(folder, "PlateViewer")
     os.makedirs(out_dir, exist_ok=True)
-    montage, _ = make_montage(images, n_images=32, rows=4, cols=8, crop_size=1020)
+    montage, _ = make_montage(images, crop_size=cfg.MONTAGE_CROP_SIZE)
     path = os.path.join(out_dir, f"{channel}_montage.png")
     Image.fromarray(montage).save(path)
     return f"Saved: {path}"
@@ -389,11 +438,11 @@ def save_controls_montage(n_clicks, well_spec, channel, folder, plate_fmt):
         return "Could not parse well specification."
     images = find_images(folder, channel=channel)
     filtered = filter_images_by_wells(images, well_set)
-    if len(filtered) < 32:
+    if len(filtered) < cfg.MONTAGE_N_IMAGES:
         return f"Not enough control images ({len(filtered)})."
     out_dir = os.path.join(folder, "PlateViewer")
     os.makedirs(out_dir, exist_ok=True)
-    montage, _ = make_montage(filtered, n_images=32, rows=4, cols=8, crop_size=1020)
+    montage, _ = make_montage(filtered, crop_size=cfg.MONTAGE_CROP_SIZE)
     path = os.path.join(out_dir, f"{channel}_controls.png")
     Image.fromarray(montage).save(path)
     return f"Saved: {path}"
@@ -417,13 +466,10 @@ def save_well_montage(n_clicks, well_id, channel, folder):
     filtered = filter_images_by_wells(images, {well_id})
     if not filtered:
         return f"No images for well {well_id}."
-    def field_key(fpath):
-        m = re.search(r'fld\s+(\d+)', os.path.basename(fpath))
-        return int(m.group(1)) if m else 0
-    filtered.sort(key=field_key)
+    sort_by_field(filtered)
     out_dir = os.path.join(folder, "PlateViewer")
     os.makedirs(out_dir, exist_ok=True)
-    montage = make_well_montage(filtered, spacing=5)
+    montage = make_well_montage(filtered)
     path = os.path.join(out_dir, f"{channel}_well_{well_id}.png")
     Image.fromarray(montage).save(path)
     return f"Saved: {path}"
@@ -447,60 +493,14 @@ def generate_contact_sheet(n_clicks, channel, folder, plate_fmt):
     plate_rows, plate_cols = PLATE_FORMATS[plate_fmt]
     fields = detect_fields(folder)
     pref_field = center_field(fields)
+    n_fields = len(fields) if fields else '?'
 
-    thumb_size = 128
-    spacing = 2
     sheet, well_positions = make_contact_sheet(
-        images, thumb_size=thumb_size, spacing=spacing,
-        plate_rows=plate_rows, plate_cols=plate_cols,
+        images, plate_rows=plate_rows, plate_cols=plate_cols,
         preferred_field=pref_field,
     )
-    b64 = numpy_to_b64png(sheet)
-    h, w = sheet.shape
-
-    step = thumb_size + spacing
-    col_tick_vals = [i * step + thumb_size // 2 for i in range(plate_cols)]
-    col_tick_labels = [str(i + 1) for i in range(plate_cols)]
-    row_tick_vals = [i * step + thumb_size // 2 for i in range(plate_rows)]
-    row_tick_labels = [chr(ord('A') + i) for i in range(plate_rows)]
-
-    fig = go.Figure()
-    fig.add_layout_image(
-        source=b64, xref="x", yref="y",
-        x=0, y=0, sizex=w, sizey=h,
-        sizing="stretch", layer="below",
-    )
-    xs = [pos[0] for pos in well_positions.values()]
-    ys = [pos[1] for pos in well_positions.values()]
-    labels = list(well_positions.keys())
-    fig.add_trace(go.Scatter(
-        x=xs, y=ys, mode='markers',
-        marker=dict(size=20, opacity=0),
-        text=labels,
-        hovertemplate='Well: %{text}<extra></extra>',
-    ))
-    fig.update_xaxes(
-        range=[0, w], side='top',
-        tickvals=col_tick_vals, ticktext=col_tick_labels,
-        tickfont=dict(size=11), showgrid=False, zeroline=False,
-        constrain='domain',
-    )
-    fig.update_yaxes(
-        range=[h, 0],
-        tickvals=row_tick_vals, ticktext=row_tick_labels,
-        tickfont=dict(size=11), showgrid=False, zeroline=False,
-        scaleanchor='x', constrain='domain',
-    )
-    fig_width = 1150
-    fig_height = int(fig_width * h / w) + 60
-    n_fields = len(fields) if fields else '?'
-    fig.update_layout(
-        width=fig_width, height=fig_height,
-        margin=dict(l=20, r=10, t=50, b=10),
-        title=f"Plate Thumbnails — field {pref_field} per well ({n_fields} fields detected, {channel} channel)",
-        showlegend=False,
-        plot_bgcolor='black',
-    )
+    fig = make_contact_sheet_figure(sheet, well_positions, plate_rows, plate_cols,
+                                    channel, n_fields, pref_field)
     return dcc.Graph(figure=fig, style={'width': '100%'}, config={'responsive': True})
 
 
@@ -526,8 +526,8 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
     # 1. Random montage
     print("[Save All] 1/5 Generating random montage...")
     images = find_images(folder, channel=channel)
-    if len(images) >= 32:
-        montage, _ = make_montage(images, n_images=32, rows=4, cols=8, crop_size=1020)
+    if len(images) >= cfg.MONTAGE_N_IMAGES:
+        montage, _ = make_montage(images, crop_size=cfg.MONTAGE_CROP_SIZE)
         path = os.path.join(out_dir, f"{channel}_montage.png")
         Image.fromarray(montage).save(path)
         saved.append("montage")
@@ -538,8 +538,8 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
         well_set = parse_well_spec(well_spec, plate_rows=plate_rows)
         if well_set:
             filtered = filter_images_by_wells(images, well_set)
-            if len(filtered) >= 32:
-                ctrl_montage, _ = make_montage(filtered, n_images=32, rows=4, cols=8, crop_size=1020)
+            if len(filtered) >= cfg.MONTAGE_N_IMAGES:
+                ctrl_montage, _ = make_montage(filtered, crop_size=cfg.MONTAGE_CROP_SIZE)
                 path = os.path.join(out_dir, f"{channel}_controls.png")
                 Image.fromarray(ctrl_montage).save(path)
                 saved.append("controls")
@@ -548,44 +548,13 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
     print("[Save All] 3/5 Generating plate thumbnails...")
     fields = detect_fields(folder)
     pref_field = center_field(fields)
-    thumb_size, spacing = 128, 2
+    n_fields = len(fields) if fields else '?'
     sheet, well_positions = make_contact_sheet(
-        images, thumb_size=thumb_size, spacing=spacing,
-        plate_rows=plate_rows, plate_cols=plate_cols,
+        images, plate_rows=plate_rows, plate_cols=plate_cols,
         preferred_field=pref_field,
     )
-    # Build the same Plotly figure as the contact sheet tab
-    b64 = numpy_to_b64png(sheet)
-    h, w = sheet.shape
-    step = thumb_size + spacing
-    col_tick_vals = [i * step + thumb_size // 2 for i in range(plate_cols)]
-    col_tick_labels = [str(i + 1) for i in range(plate_cols)]
-    row_tick_vals = [i * step + thumb_size // 2 for i in range(plate_rows)]
-    row_tick_labels = [chr(ord('A') + i) for i in range(plate_rows)]
-    fig_contact = go.Figure()
-    fig_contact.add_layout_image(
-        source=b64, xref="x", yref="y",
-        x=0, y=0, sizex=w, sizey=h,
-        sizing="stretch", layer="below",
-    )
-    fig_contact.update_xaxes(
-        range=[0, w], side='top',
-        tickvals=col_tick_vals, ticktext=col_tick_labels,
-        tickfont=dict(size=11), showgrid=False, zeroline=False,
-    )
-    fig_contact.update_yaxes(
-        range=[h, 0],
-        tickvals=row_tick_vals, ticktext=row_tick_labels,
-        tickfont=dict(size=11), showgrid=False, zeroline=False,
-        scaleanchor='x',
-    )
-    n_fields = len(fields) if fields else '?'
-    fig_contact.update_layout(
-        width=1150, height=int(1150 * h / w) + 60,
-        margin=dict(l=20, r=10, t=50, b=10),
-        title=f"Plate Thumbnails — field {pref_field} per well ({n_fields} fields, {channel})",
-        showlegend=False, plot_bgcolor='black',
-    )
+    fig_contact = make_contact_sheet_figure(sheet, well_positions, plate_rows, plate_cols,
+                                            channel, n_fields, pref_field)
     path = os.path.join(out_dir, f"{channel}_thumbnails.png")
     fig_contact.write_image(path, scale=2)
     saved.append("thumbnails")

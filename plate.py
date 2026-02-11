@@ -162,3 +162,11 @@ def filter_images_by_wells(image_list, well_set):
         if w and w in well_set:
             filtered.append(fpath)
     return filtered
+
+
+def sort_by_field(image_list):
+    """Sort a list of image paths in-place by their field number."""
+    def _field_key(fpath):
+        m = re.search(r'fld\s+(\d+)', os.path.basename(fpath))
+        return int(m.group(1)) if m else 0
+    image_list.sort(key=_field_key)

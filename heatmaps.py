@@ -8,8 +8,7 @@ import tifffile
 
 from plate import find_images, parse_well, well_to_row_col
 from image import uint16_to_uint8
-
-N_WORKERS = 8
+import config as cfg
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +76,7 @@ def compute_intensity_heatmap(plate_folder, channel, plate_rows=16, plate_cols=2
             print(f"  Loading cached intensity heatmap: {cache}")
             return cached
     images = find_images(plate_folder, channel=channel)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=N_WORKERS) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=cfg.N_WORKERS) as pool:
         results = list(pool.map(_read_and_mean, images))
     heatmap = _aggregate_to_heatmap(results, plate_rows, plate_cols)
     np.save(cache, heatmap)
@@ -94,7 +93,7 @@ def compute_focus_heatmap(plate_folder, channel, plate_rows=16, plate_cols=24):
             print(f"  Loading cached focus heatmap: {cache}")
             return cached
     images = find_images(plate_folder, channel=channel)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=N_WORKERS) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=cfg.N_WORKERS) as pool:
         results = list(pool.map(_read_and_focus, images))
     heatmap = _aggregate_to_heatmap(results, plate_rows, plate_cols)
     np.save(cache, heatmap)

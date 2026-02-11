@@ -17,9 +17,11 @@ import tifffile
 
 from plate import find_images, parse_filename, parse_well
 from image import uint16_to_uint8, burn_label
+import config as cfg
 
 
-def make_montage(image_list, n_images=32, rows=4, cols=8, crop_size=512, spacing=5):
+def make_montage(image_list, n_images=cfg.MONTAGE_N_IMAGES, rows=cfg.MONTAGE_ROWS,
+                  cols=cfg.MONTAGE_COLS, crop_size=512, spacing=cfg.MONTAGE_SPACING):
     """Randomly select images and assemble into a montage.
 
     Parameters
@@ -79,7 +81,7 @@ def make_montage(image_list, n_images=32, rows=4, cols=8, crop_size=512, spacing
     for idx, tile in enumerate(tiles):
         label = parse_filename(selected_files[idx])
         if label:
-            tile = burn_label(tile, label, font_size=72)
+            tile = burn_label(tile, label, font_size=cfg.MONTAGE_FONT_SIZE)
         r = idx // cols
         c = idx % cols
         y0 = r * (crop_size + spacing)
@@ -89,7 +91,7 @@ def make_montage(image_list, n_images=32, rows=4, cols=8, crop_size=512, spacing
     return montage, selected_files
 
 
-def make_well_montage(image_list, spacing=5):
+def make_well_montage(image_list, spacing=cfg.WELL_SPACING):
     """Assemble all images (fields) for a single well into a grid.
 
     Shows the full image of each field, downsampled 2x. Images are shown
@@ -117,10 +119,10 @@ def make_well_montage(image_list, spacing=5):
         img = tifffile.imread(fpath)
         if img.dtype != np.uint8:
             img = uint16_to_uint8(img)
-        tile = img[::4, ::4]  # downsample 4x
+        tile = img[::cfg.WELL_DOWNSAMPLE, ::cfg.WELL_DOWNSAMPLE]
         label = parse_filename(fpath)
         if label:
-            tile = burn_label(tile, label, font_size=24)
+            tile = burn_label(tile, label, font_size=cfg.WELL_FONT_SIZE)
         tiles.append(tile)
 
     tile_h, tile_w = tiles[0].shape[:2]
@@ -138,7 +140,8 @@ def make_well_montage(image_list, spacing=5):
     return montage
 
 
-def make_contact_sheet(image_list, thumb_size=128, spacing=2, plate_rows=16, plate_cols=24,
+def make_contact_sheet(image_list, thumb_size=cfg.CONTACT_THUMB_SIZE, spacing=cfg.CONTACT_SPACING,
+                        plate_rows=16, plate_cols=24,
                        preferred_field=None):
     """Create a plate-layout contact sheet: one thumbnail per well in a plate grid.
 
@@ -192,7 +195,7 @@ def make_contact_sheet(image_list, thumb_size=128, spacing=2, plate_rows=16, pla
         return well, resize(img, (thumb_size, thumb_size), preserve_range=True, anti_aliasing=True).astype(np.uint8)
 
     well_positions = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=cfg.N_WORKERS) as pool:
         results = pool.map(_load_thumb, well_images.items())
         for well, thumb in results:
             row = ord(well[0]) - ord('A')
@@ -211,11 +214,14 @@ def main():
     parser.add_argument("plate_folder", help="Path to the plate folder containing TIF images.")
     parser.add_argument("-c", "--channel", default=None,
                         help="Filter by channel name substring (e.g. 'Blue', 'Green2', 'FarRed').")
-    parser.add_argument("-n", "--n_images", type=int, default=32,
-                        help="Number of images to sample (default: 32).")
-    parser.add_argument("--rows", type=int, default=4, help="Montage rows (default: 4).")
-    parser.add_argument("--cols", type=int, default=8, help="Montage columns (default: 8).")
-    parser.add_argument("--crop_size", type=int, default=1020, help="Center crop size in pixels (default: 1020).")
+    parser.add_argument("-n", "--n_images", type=int, default=cfg.MONTAGE_N_IMAGES,
+                        help=f"Number of images to sample (default: {cfg.MONTAGE_N_IMAGES}).")
+    parser.add_argument("--rows", type=int, default=cfg.MONTAGE_ROWS,
+                        help=f"Montage rows (default: {cfg.MONTAGE_ROWS}).")
+    parser.add_argument("--cols", type=int, default=cfg.MONTAGE_COLS,
+                        help=f"Montage columns (default: {cfg.MONTAGE_COLS}).")
+    parser.add_argument("--crop_size", type=int, default=cfg.MONTAGE_CROP_SIZE,
+                        help=f"Center crop size in pixels (default: {cfg.MONTAGE_CROP_SIZE}).")
     parser.add_argument("-o", "--output", default=None,
                         help="Output TIF path. Default: <plate_folder>_montage_<rows>x<cols>.tif")
     args = parser.parse_args()
