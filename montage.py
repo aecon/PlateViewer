@@ -79,7 +79,7 @@ def make_montage(image_list, n_images=32, rows=4, cols=8, crop_size=512, spacing
     for idx, tile in enumerate(tiles):
         label = parse_filename(selected_files[idx])
         if label:
-            tile = burn_label(tile, label)
+            tile = burn_label(tile, label, font_size=72)
         r = idx // cols
         c = idx % cols
         y0 = r * (crop_size + spacing)
