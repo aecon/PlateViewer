@@ -89,6 +89,55 @@ def make_montage(image_list, n_images=32, rows=4, cols=8, crop_size=512, spacing
     return montage, selected_files
 
 
+def make_well_montage(image_list, spacing=5):
+    """Assemble all images (fields) for a single well into a grid.
+
+    Shows the full image of each field, downsampled 2x. Images are shown
+    in the order provided (caller should sort by field). Grid dimensions
+    are auto-computed from the number of images.
+
+    Parameters
+    ----------
+    image_list : list of str
+        Paths to TIF images for one well (all fields, one channel).
+    spacing : int
+        Gap between tiles (pixels).
+
+    Returns
+    -------
+    montage : np.ndarray (uint8)
+        The assembled montage image.
+    """
+    n = len(image_list)
+    cols = int(np.ceil(np.sqrt(n)))
+    rows = int(np.ceil(n / cols))
+
+    tiles = []
+    for fpath in image_list:
+        img = tifffile.imread(fpath)
+        if img.dtype != np.uint8:
+            img = uint16_to_uint8(img)
+        tile = img[::4, ::4]  # downsample 4x
+        label = parse_filename(fpath)
+        if label:
+            tile = burn_label(tile, label, font_size=24)
+        tiles.append(tile)
+
+    tile_h, tile_w = tiles[0].shape[:2]
+    montage_h = rows * tile_h + (rows - 1) * spacing
+    montage_w = cols * tile_w + (cols - 1) * spacing
+    montage = np.full((montage_h, montage_w), 255, dtype=np.uint8)
+
+    for idx, tile in enumerate(tiles):
+        r = idx // cols
+        c = idx % cols
+        y0 = r * (tile_h + spacing)
+        x0 = c * (tile_w + spacing)
+        montage[y0:y0 + tile_h, x0:x0 + tile_w] = tile
+
+    return montage
+
+
 def make_contact_sheet(image_list, thumb_size=128, spacing=2, plate_rows=16, plate_cols=24,
                        preferred_field=None):
     """Create a plate-layout contact sheet: one thumbnail per well in a plate grid.

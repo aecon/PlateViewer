@@ -11,6 +11,7 @@ import argparse
 import glob
 import math
 import os
+import re
 
 import dash
 from dash import html, dcc, Input, Output, State, callback
@@ -21,7 +22,7 @@ from PIL import Image
 from plate import (find_images, detect_channels, detect_fields, center_field,
                    parse_well_spec, filter_images_by_wells, PLATE_FORMATS)
 from image import numpy_to_b64png
-from montage import make_montage, make_contact_sheet
+from montage import make_montage, make_well_montage, make_contact_sheet
 from heatmaps import compute_intensity_heatmap, compute_focus_heatmap
 
 # ---------------------------------------------------------------------------
@@ -104,6 +105,7 @@ app.layout = html.Div([
     dcc.Tabs(id='tabs', value='tab-montage', children=[
         dcc.Tab(label='Random Montage', value='tab-montage'),
         dcc.Tab(label='Control Montage', value='tab-controls'),
+        dcc.Tab(label='Single Well', value='tab-well'),
         dcc.Tab(label='Plate Thumbnails', value='tab-contact'),
         dcc.Tab(label='Intensity Heatmap', value='tab-intensity'),
         dcc.Tab(label='Focus Heatmap', value='tab-focus'),
@@ -119,6 +121,15 @@ app.layout = html.Div([
         html.Button("Generate Control Montage", id='btn-controls', n_clicks=0,
                     style={'margin': '10px 0'}),
         dcc.Loading(html.Div(id='controls-output')),
+    ]),
+    html.Div(id='panel-well', style={'margin': '10px', 'display': 'none'}, children=[
+        html.Div([
+            html.Label("Well ID: "),
+            dcc.Input(id='well-id-input', type='text', placeholder='e.g. A05',
+                      style={'width': '100px', 'marginRight': '10px'}),
+            html.Button("Generate", id='btn-well', n_clicks=0),
+        ], style={'margin': '10px 0'}),
+        dcc.Loading(html.Div(id='well-output')),
     ]),
     html.Div(id='panel-contact', style={'margin': '10px', 'display': 'none'}, children=[
         html.Button("Generate Plate Thumbnails", id='btn-contact', n_clicks=0,
@@ -186,6 +197,7 @@ def load_plate(n_clicks, folder):
 @callback(
     Output('panel-montage', 'style'),
     Output('panel-controls', 'style'),
+    Output('panel-well', 'style'),
     Output('panel-contact', 'style'),
     Output('panel-intensity', 'style'),
     Output('panel-focus', 'style'),
@@ -194,9 +206,9 @@ def load_plate(n_clicks, folder):
 def toggle_tab_visibility(tab):
     hidden = {'margin': '10px', 'display': 'none'}
     visible = {'margin': '10px', 'display': 'block'}
-    tab_map = {'tab-montage': 0, 'tab-controls': 1, 'tab-contact': 2,
-               'tab-intensity': 3, 'tab-focus': 4}
-    styles = [hidden] * 5
+    tab_map = {'tab-montage': 0, 'tab-controls': 1, 'tab-well': 2,
+               'tab-contact': 3, 'tab-intensity': 4, 'tab-focus': 5}
+    styles = [hidden] * 6
     styles[tab_map.get(tab, 0)] = visible
     return styles
 
@@ -287,6 +299,37 @@ def generate_controls_montage(n_clicks, well_spec, channel, folder, plate_fmt):
     return html.Div([
         html.P(f"Showing 32 random images from {len(filtered)} control images, "
                f"{len(well_set)} wells ({channel} channel)"),
+        html.Img(src=b64, style={'width': '100%', 'imageRendering': 'auto'}),
+    ])
+
+
+@callback(
+    Output('well-output', 'children'),
+    Input('btn-well', 'n_clicks'),
+    State('well-id-input', 'value'),
+    State('channel-dropdown', 'value'),
+    State('plate-folder-store', 'data'),
+    prevent_initial_call=True,
+)
+def generate_well_montage(n_clicks, well_id, channel, folder):
+    if not folder or not channel:
+        return html.Div("Load a plate folder first.")
+    if not well_id or not re.match(r'^[A-P]\d+$', well_id.strip(), re.IGNORECASE):
+        return html.Div("Enter a valid well ID (e.g. A05).")
+    well_id = f"{well_id[0].upper()}{int(well_id[1:]):02d}"
+    images = find_images(folder, channel=channel)
+    filtered = filter_images_by_wells(images, {well_id})
+    if not filtered:
+        return html.Div(f"No images found for well {well_id}.")
+    # sort by field number
+    def field_key(fpath):
+        m = re.search(r'fld\s+(\d+)', os.path.basename(fpath))
+        return int(m.group(1)) if m else 0
+    filtered.sort(key=field_key)
+    montage = make_well_montage(filtered, spacing=5)
+    b64 = numpy_to_b64png(montage)
+    return html.Div([
+        html.P(f"Well {well_id} — {len(filtered)} fields ({channel} channel)"),
         html.Img(src=b64, style={'width': '100%', 'imageRendering': 'auto'}),
     ])
 
