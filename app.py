@@ -19,6 +19,7 @@ import plotly.graph_objects as go
 from PIL import Image
 
 import config as cfg
+from paths import plate_output_dir
 from plate import (find_images, detect_channels, detect_fields, center_field,
                    parse_well_spec, filter_images_by_wells, sort_by_field, PLATE_FORMATS)
 from image import numpy_to_b64png
@@ -249,11 +250,11 @@ def _resolve_output_dir(output_folder, plate_folder):
     """Return the output directory to use, creating it if needed.
 
     Uses output_folder if provided, otherwise falls back to
-    <plate_folder>/PlateViewer/.
+    the centralised plate output dir under ~/PlateViewer_output/.
     """
     out_dir = output_folder.strip() if output_folder else ""
     if not out_dir:
-        out_dir = os.path.join(plate_folder, "PlateViewer")
+        out_dir = plate_output_dir(plate_folder)
     os.makedirs(out_dir, exist_ok=True)
     return out_dir
 
@@ -317,13 +318,7 @@ def load_plate(n_clicks, folder):
     options = [{'label': ch, 'value': ch} for ch in channels]
     status = f"Loaded: {len(tifs)} images, {len(channels)} channels."
 
-    if os.access(folder, os.W_OK):
-        out_folder = os.path.join(folder, "PlateViewer")
-    else:
-        plate_name = os.path.basename(os.path.normpath(folder))
-        out_folder = os.path.join(os.path.expanduser("~"),
-                                  "PlateViewer_output", plate_name)
-        status += f" Plate folder is read-only — output redirected to {out_folder}"
+    out_folder = plate_output_dir(folder)
 
     return options, channels[0], status, folder, out_folder
 
@@ -643,7 +638,7 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec, output_folde
     fig_contact = make_contact_sheet_figure(sheet, well_positions, plate_rows, plate_cols,
                                             channel, n_fields, pref_field)
     path = os.path.join(out_dir, f"{channel}_thumbnails.png")
-    fig_contact.write_image(path, scale=2)
+    fig_contact.write_image(path, scale=cfg.EXPORT_SCALE)
     saved.append("thumbnails")
 
     # 4. Intensity heatmap
@@ -652,7 +647,7 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec, output_folde
     fig_int = make_plate_heatmap_figure(heatmap_int, title=f"Mean Intensity — {channel}",
                                         plate_rows=plate_rows, plate_cols=plate_cols)
     path = os.path.join(out_dir, f"{channel}_intensity.png")
-    fig_int.write_image(path, scale=2)
+    fig_int.write_image(path, scale=cfg.EXPORT_SCALE)
     saved.append("intensity")
 
     # 5. Focus heatmap (Laplacian variance)
@@ -661,7 +656,7 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec, output_folde
     fig_foc = make_plate_heatmap_figure(heatmap_foc, title=f"Focus (Laplacian variance) — {channel}",
                                         plate_rows=plate_rows, plate_cols=plate_cols)
     path = os.path.join(out_dir, f"{channel}_focus.png")
-    fig_foc.write_image(path, scale=2)
+    fig_foc.write_image(path, scale=cfg.EXPORT_SCALE)
     saved.append("focus")
 
     # 6. Focus heatmap (PLLS)
@@ -670,7 +665,7 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec, output_folde
     fig_plls = make_plate_heatmap_figure(heatmap_plls, title=f"Focus (Power Log-Log Slope) — {channel}",
                                          plate_rows=plate_rows, plate_cols=plate_cols)
     path = os.path.join(out_dir, f"{channel}_plls.png")
-    fig_plls.write_image(path, scale=2)
+    fig_plls.write_image(path, scale=cfg.EXPORT_SCALE)
     saved.append("plls")
 
     print(f"[Save All] Done — saved {len(saved)} plots.")

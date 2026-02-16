@@ -1,7 +1,6 @@
 """Plate heatmap computation: intensity, focus. Threaded I/O with disk caching."""
 
 import concurrent.futures
-import hashlib
 import os
 
 import numpy as np
@@ -9,6 +8,7 @@ import tifffile
 
 from plate import find_images, parse_well, well_to_row_col
 from image import uint16_to_uint8
+from paths import plate_cache_dir
 import config as cfg
 
 
@@ -99,29 +99,8 @@ def _aggregate_to_heatmap(results, plate_rows=16, plate_cols=24):
 
 
 def _cache_path(plate_folder, channel, metric):
-    """Return path for a cached heatmap .npy file.
-
-    Prefers writing inside the plate folder (keeps cache next to data).
-    Falls back to <code_dir>/.cache/<hash>/ when the plate folder is read-only.
-    """
-    plate_name = os.path.basename(os.path.normpath(plate_folder))
-    filename = f".plateviewer_{plate_name}_{channel}_{metric}.npy"
-
-    # Prefer the plate folder itself
-    plate_cache = os.path.join(plate_folder, filename)
-    if os.access(plate_folder, os.W_OK):
-        return plate_cache
-
-    # If an existing cache file is already readable there, use it (read-only OK)
-    if os.path.isfile(plate_cache):
-        return plate_cache
-
-    # Fall back to <code_dir>/.cache/<hash>/
-    abs_path = os.path.abspath(plate_folder)
-    folder_hash = hashlib.sha256(abs_path.encode()).hexdigest()[:12]
-    fallback_dir = os.path.join(cfg.FALLBACK_CACHE_DIR, folder_hash)
-    os.makedirs(fallback_dir, exist_ok=True)
-    return os.path.join(fallback_dir, filename)
+    """Return path for a cached heatmap .npy file."""
+    return os.path.join(plate_cache_dir(plate_folder), f"{channel}_{metric}.npy")
 
 
 # ---------------------------------------------------------------------------

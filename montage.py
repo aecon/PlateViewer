@@ -246,10 +246,11 @@ def main():
     if args.output:
         out_path = args.output
     else:
+        from paths import plate_output_dir
         plate_name = os.path.basename(os.path.normpath(args.plate_folder))
         channel_tag = f"_{args.channel}" if args.channel else ""
         out_path = os.path.join(
-            args.plate_folder,
+            plate_output_dir(args.plate_folder),
             f"{plate_name}{channel_tag}_montage_{args.rows}x{args.cols}.tif"
         )
 

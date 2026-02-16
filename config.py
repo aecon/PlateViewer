@@ -31,6 +31,7 @@ CONTACT_FIG_WIDTH = 1150
 # ---------------------------------------------------------------------------
 HEATMAP_FIG_WIDTH = 900
 HEATMAP_FIG_HEIGHT = 500
+EXPORT_SCALE = 2  # Plotly write_image scale factor for saved PNGs
 
 # ---------------------------------------------------------------------------
 # Image conversion
@@ -39,9 +40,9 @@ PERCENTILE_LOW = 1
 PERCENTILE_HIGH = 99
 
 # ---------------------------------------------------------------------------
-# Cache
+# Output and cache paths
 # ---------------------------------------------------------------------------
-FALLBACK_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cache")
+APP_DATA_DIR = os.path.join(os.path.expanduser("~"), "PlateViewer_output")
 
 # ---------------------------------------------------------------------------
 # Threading
