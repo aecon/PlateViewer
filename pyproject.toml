@@ -6,9 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "plateviewer"
 version = "1.0.0"
 description = "Dash web interface for high-content screening plate QC"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "dash>=2.0",
+    "dash>=4.0",
     "kaleido",
     "numpy",
     "pillow",
