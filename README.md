@@ -14,6 +14,18 @@ PlateViewer helps microscopists and screening scientists quickly assess image qu
 ```bash
 conda create -n PlateViewer python=3.11
 conda activate PlateViewer
+pip install .
+```
+
+For development (editable install — changes take effect immediately):
+
+```bash
+pip install -e .
+```
+
+To reproduce the exact tested environment, use the pinned lockfile instead:
+
+```bash
 pip install -r requirements.txt
 ```
 
@@ -32,7 +44,8 @@ Double-click the **PlateViewer** shortcut on the Desktop. The browser opens auto
 #### Command line
 
 ```bash
-conda run -n PlateViewer python app.py
+conda activate PlateViewer
+plateviewer
 ```
 
 Use `--port 8051` to change the port.
@@ -125,21 +138,24 @@ Two complementary metrics are shown:
 | tifffile | TIFF file reading |
 | Kaleido | Static image export |
 
-All dependencies are installed via `pip install -r requirements.txt`.
+All dependencies are installed automatically via `pip install .`.
 
 
 ## Project Structure
 
 ```
-app.py          — Dash web UI (entry point)
-config.py       — Centralized constants (montage params, font path, threading, etc.)
-paths.py        — Output and cache path resolution
-plate.py        — Plate-level logic: file discovery, filename parsing, well utilities
-image.py        — Image utilities: uint8 conversion, label burning, PNG encoding
-montage.py      — Montage assembly (random, single-well, contact sheet)
-heatmaps.py     — Plate heatmap computation (threaded I/O, disk caching)
-launch.sh             — Desktop launcher script (activates conda, starts app)
-install_desktop.sh    — Creates and installs the Desktop shortcut
+plateviewer/           — Python package (installed via pip)
+    app.py             — Dash web UI and entry point
+    config.py          — Centralized constants (montage params, font path, threading, etc.)
+    paths.py           — Output and cache path resolution
+    plate.py           — Plate-level logic: file discovery, filename parsing, well utilities
+    image.py           — Image utilities: uint8 conversion, label burning, PNG encoding
+    montage.py         — Montage assembly (random, single-well, contact sheet)
+    heatmaps.py        — Plate heatmap computation (threaded I/O, disk caching)
+pyproject.toml         — Package metadata and dependencies
+requirements.txt       — Pinned dependency versions (reproducible environment)
+launch.sh              — Desktop launcher script (activates conda, starts app)
+install_desktop.sh     — Creates and installs the Desktop shortcut
 ```
 
 
