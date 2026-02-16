@@ -38,7 +38,7 @@ plateviewer
 
 The browser opens automatically. Use `--port 8051` to change the port.
 
-#### Workflow
+#### Workflow:
 
 1. Enter the plate folder path (or click **Browse**, or drag-and-drop) and click **Load**
 2. Select a channel and plate format (384-well or 96-well)
