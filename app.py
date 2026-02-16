@@ -157,6 +157,15 @@ app.layout = html.Div([
                     type='dot'),
     ], style={'margin': '10px', 'display': 'flex', 'alignItems': 'center', 'gap': '10px'}),
 
+    # -- Output folder --
+    html.Div([
+        html.Label("Output folder:"),
+        dcc.Input(id='output-folder', type='text',
+                  placeholder='Auto-set on Load (or choose manually)',
+                  style={'width': '600px', 'marginRight': '10px'}),
+        html.Button("Browse", id='btn-browse-output', n_clicks=0),
+    ], style={'margin': '10px'}),
+
     # -- Tabs --
     dcc.Tabs(id='tabs', value='tab-montage', children=[
         dcc.Tab(label='Random Montage', value='tab-montage'),
@@ -233,6 +242,23 @@ app.layout = html.Div([
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _resolve_output_dir(output_folder, plate_folder):
+    """Return the output directory to use, creating it if needed.
+
+    Uses output_folder if provided, otherwise falls back to
+    <plate_folder>/PlateViewer/.
+    """
+    out_dir = output_folder.strip() if output_folder else ""
+    if not out_dir:
+        out_dir = os.path.join(plate_folder, "PlateViewer")
+    os.makedirs(out_dir, exist_ok=True)
+    return out_dir
+
+
+# ---------------------------------------------------------------------------
 # Callbacks
 # ---------------------------------------------------------------------------
 
@@ -253,10 +279,27 @@ def browse_folder(n_clicks):
 
 
 @callback(
+    Output('output-folder', 'value', allow_duplicate=True),
+    Input('btn-browse-output', 'n_clicks'),
+    prevent_initial_call=True,
+)
+def browse_output_folder(n_clicks):
+    import tkinter as tk
+    from tkinter import filedialog
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    folder = filedialog.askdirectory(title="Select output folder")
+    root.destroy()
+    return folder if folder else dash.no_update
+
+
+@callback(
     Output('channel-dropdown', 'options'),
     Output('channel-dropdown', 'value'),
     Output('folder-status', 'children'),
     Output('plate-folder-store', 'data'),
+    Output('output-folder', 'value'),
     Input('btn-load', 'n_clicks'),
     State('plate-folder', 'value'),
     prevent_initial_call=True,
@@ -266,13 +309,23 @@ def load_plate(n_clicks, folder):
         from urllib.parse import unquote
         folder = unquote(folder.strip().removeprefix('file://'))
     if not folder or not os.path.isdir(folder):
-        return [], None, "Invalid folder path.", None
+        return [], None, "Invalid folder path.", None, ""
     channels = detect_channels(folder)
     if not channels:
-        return [], None, "No TIF images found in folder.", None
+        return [], None, "No TIF images found in folder.", None, ""
     tifs = glob.glob(os.path.join(folder, "*.tif"))
     options = [{'label': ch, 'value': ch} for ch in channels]
-    return options, channels[0], f"Loaded: {len(tifs)} images, {len(channels)} channels.", folder
+    status = f"Loaded: {len(tifs)} images, {len(channels)} channels."
+
+    if os.access(folder, os.W_OK):
+        out_folder = os.path.join(folder, "PlateViewer")
+    else:
+        plate_name = os.path.basename(os.path.normpath(folder))
+        out_folder = os.path.join(os.path.expanduser("~"),
+                                  "PlateViewer_output", plate_name)
+        status += f" Plate folder is read-only — output redirected to {out_folder}"
+
+    return options, channels[0], status, folder, out_folder
 
 
 @callback(
@@ -424,20 +477,23 @@ def generate_well_montage(n_clicks, well_id, channel, folder):
     Input('btn-save-montage', 'n_clicks'),
     State('channel-dropdown', 'value'),
     State('plate-folder-store', 'data'),
+    State('output-folder', 'value'),
     prevent_initial_call=True,
 )
-def save_montage(n_clicks, channel, folder):
+def save_montage(n_clicks, channel, folder, output_folder):
     if not folder or not channel:
         return "Load a plate folder first."
     images = find_images(folder, channel=channel)
     if len(images) < cfg.MONTAGE_N_IMAGES:
         return f"Not enough images ({len(images)})."
-    out_dir = os.path.join(folder, "PlateViewer")
-    os.makedirs(out_dir, exist_ok=True)
-    montage, _ = make_montage(images, crop_size=cfg.MONTAGE_CROP_SIZE)
-    path = os.path.join(out_dir, f"{channel}_montage.png")
-    Image.fromarray(montage).save(path)
-    return f"Saved: {path}"
+    try:
+        out_dir = _resolve_output_dir(output_folder, folder)
+        montage, _ = make_montage(images, crop_size=cfg.MONTAGE_CROP_SIZE)
+        path = os.path.join(out_dir, f"{channel}_montage.png")
+        Image.fromarray(montage).save(path)
+        return f"Saved: {path}"
+    except PermissionError:
+        return "Cannot save: output folder is not writable."
 
 
 @callback(
@@ -447,9 +503,10 @@ def save_montage(n_clicks, channel, folder):
     State('channel-dropdown', 'value'),
     State('plate-folder-store', 'data'),
     State('plate-format-dropdown', 'value'),
+    State('output-folder', 'value'),
     prevent_initial_call=True,
 )
-def save_controls_montage(n_clicks, well_spec, channel, folder, plate_fmt):
+def save_controls_montage(n_clicks, well_spec, channel, folder, plate_fmt, output_folder):
     if not folder or not channel:
         return "Load a plate folder first."
     if not well_spec:
@@ -462,12 +519,14 @@ def save_controls_montage(n_clicks, well_spec, channel, folder, plate_fmt):
     filtered = filter_images_by_wells(images, well_set)
     if len(filtered) < cfg.MONTAGE_N_IMAGES:
         return f"Not enough control images ({len(filtered)})."
-    out_dir = os.path.join(folder, "PlateViewer")
-    os.makedirs(out_dir, exist_ok=True)
-    montage, _ = make_montage(filtered, crop_size=cfg.MONTAGE_CROP_SIZE)
-    path = os.path.join(out_dir, f"{channel}_controls.png")
-    Image.fromarray(montage).save(path)
-    return f"Saved: {path}"
+    try:
+        out_dir = _resolve_output_dir(output_folder, folder)
+        montage, _ = make_montage(filtered, crop_size=cfg.MONTAGE_CROP_SIZE)
+        path = os.path.join(out_dir, f"{channel}_controls.png")
+        Image.fromarray(montage).save(path)
+        return f"Saved: {path}"
+    except PermissionError:
+        return "Cannot save: output folder is not writable."
 
 
 @callback(
@@ -476,9 +535,10 @@ def save_controls_montage(n_clicks, well_spec, channel, folder, plate_fmt):
     State('well-id-input', 'value'),
     State('channel-dropdown', 'value'),
     State('plate-folder-store', 'data'),
+    State('output-folder', 'value'),
     prevent_initial_call=True,
 )
-def save_well_montage(n_clicks, well_id, channel, folder):
+def save_well_montage(n_clicks, well_id, channel, folder, output_folder):
     if not folder or not channel:
         return "Load a plate folder first."
     if not well_id or not re.match(r'^[A-P]\d+$', well_id.strip(), re.IGNORECASE):
@@ -489,12 +549,14 @@ def save_well_montage(n_clicks, well_id, channel, folder):
     if not filtered:
         return f"No images for well {well_id}."
     sort_by_field(filtered)
-    out_dir = os.path.join(folder, "PlateViewer")
-    os.makedirs(out_dir, exist_ok=True)
-    montage = make_well_montage(filtered)
-    path = os.path.join(out_dir, f"{channel}_well_{well_id}.png")
-    Image.fromarray(montage).save(path)
-    return f"Saved: {path}"
+    try:
+        out_dir = _resolve_output_dir(output_folder, folder)
+        montage = make_well_montage(filtered)
+        path = os.path.join(out_dir, f"{channel}_well_{well_id}.png")
+        Image.fromarray(montage).save(path)
+        return f"Saved: {path}"
+    except PermissionError:
+        return "Cannot save: output folder is not writable."
 
 
 @callback(
@@ -533,15 +595,18 @@ def generate_contact_sheet(n_clicks, channel, folder, plate_fmt):
     State('plate-folder-store', 'data'),
     State('plate-format-dropdown', 'value'),
     State('control-wells-input', 'value'),
+    State('output-folder', 'value'),
     prevent_initial_call=True,
 )
-def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec):
+def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec, output_folder):
     if not folder or not channel:
         return "Load a plate folder first."
 
     plate_rows, plate_cols = PLATE_FORMATS[plate_fmt]
-    out_dir = os.path.join(folder, "PlateViewer")
-    os.makedirs(out_dir, exist_ok=True)
+    try:
+        out_dir = _resolve_output_dir(output_folder, folder)
+    except PermissionError:
+        return "Cannot save: output folder is not writable."
     saved = []
     print(f"[Save All] Saving plots to {out_dir}/ ...")
 
