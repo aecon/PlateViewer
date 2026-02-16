@@ -104,41 +104,41 @@ def _cache_path(plate_folder, channel, metric):
 
 
 # ---------------------------------------------------------------------------
+# Generic computation with caching
+# ---------------------------------------------------------------------------
+
+def _compute_heatmap(worker_fn, plate_folder, channel, metric,
+                     plate_rows=16, plate_cols=24):
+    """Compute a per-well metric using worker_fn. Caches result to disk."""
+    cache = _cache_path(plate_folder, channel, metric)
+    if os.path.exists(cache):
+        cached = np.load(cache)
+        if cached.shape == (plate_rows, plate_cols):
+            print(f"  Loading cached {metric} heatmap: {cache}")
+            return cached
+    images = find_images(plate_folder, channel=channel)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=cfg.N_WORKERS) as pool:
+        results = list(pool.map(worker_fn, images))
+    heatmap = _aggregate_to_heatmap(results, plate_rows, plate_cols)
+    np.save(cache, heatmap)
+    print(f"  Cached {metric} heatmap: {cache}")
+    return heatmap
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 def compute_intensity_heatmap(plate_folder, channel, plate_rows=16, plate_cols=24):
     """Compute mean intensity per well for a given channel. Returns a plate-shaped array."""
-    cache = _cache_path(plate_folder, channel, "intensity")
-    if os.path.exists(cache):
-        cached = np.load(cache)
-        if cached.shape == (plate_rows, plate_cols):
-            print(f"  Loading cached intensity heatmap: {cache}")
-            return cached
-    images = find_images(plate_folder, channel=channel)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=cfg.N_WORKERS) as pool:
-        results = list(pool.map(_read_and_mean, images))
-    heatmap = _aggregate_to_heatmap(results, plate_rows, plate_cols)
-    np.save(cache, heatmap)
-    print(f"  Cached intensity heatmap: {cache}")
-    return heatmap
+    return _compute_heatmap(_read_and_mean, plate_folder, channel, "intensity",
+                            plate_rows, plate_cols)
 
 
 def compute_focus_heatmap(plate_folder, channel, plate_rows=16, plate_cols=24):
     """Compute Laplacian variance (focus metric) per well. Returns a plate-shaped array."""
-    cache = _cache_path(plate_folder, channel, "focus")
-    if os.path.exists(cache):
-        cached = np.load(cache)
-        if cached.shape == (plate_rows, plate_cols):
-            print(f"  Loading cached focus heatmap: {cache}")
-            return cached
-    images = find_images(plate_folder, channel=channel)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=cfg.N_WORKERS) as pool:
-        results = list(pool.map(_read_and_focus, images))
-    heatmap = _aggregate_to_heatmap(results, plate_rows, plate_cols)
-    np.save(cache, heatmap)
-    print(f"  Cached focus heatmap: {cache}")
-    return heatmap
+    return _compute_heatmap(_read_and_focus, plate_folder, channel, "focus",
+                            plate_rows, plate_cols)
 
 
 def compute_plls_heatmap(plate_folder, channel, plate_rows=16, plate_cols=24):
@@ -147,16 +147,5 @@ def compute_plls_heatmap(plate_folder, channel, plate_rows=16, plate_cols=24):
     More negative values indicate blurrier wells (high-frequency loss).
     Reference: Bray et al., J Biomol Screen, 2012.
     """
-    cache = _cache_path(plate_folder, channel, "plls")
-    if os.path.exists(cache):
-        cached = np.load(cache)
-        if cached.shape == (plate_rows, plate_cols):
-            print(f"  Loading cached PLLS heatmap: {cache}")
-            return cached
-    images = find_images(plate_folder, channel=channel)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=cfg.N_WORKERS) as pool:
-        results = list(pool.map(_read_and_plls, images))
-    heatmap = _aggregate_to_heatmap(results, plate_rows, plate_cols)
-    np.save(cache, heatmap)
-    print(f"  Cached PLLS heatmap: {cache}")
-    return heatmap
+    return _compute_heatmap(_read_and_plls, plate_folder, channel, "plls",
+                            plate_rows, plate_cols)
