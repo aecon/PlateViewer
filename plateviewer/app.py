@@ -268,15 +268,21 @@ def _resolve_output_dir(output_folder, plate_folder):
 @callback(
     Output('plate-folder', 'value'),
     Input('btn-browse', 'n_clicks'),
+    State('plate-folder', 'value'),
     prevent_initial_call=True,
 )
-def browse_folder(n_clicks):
+def browse_folder(n_clicks, current_folder):
     import tkinter as tk
     from tkinter import filedialog
+    initial = None
+    if current_folder:
+        parent = os.path.dirname(os.path.normpath(current_folder))
+        if os.path.isdir(parent):
+            initial = parent
     root = tk.Tk()
     root.withdraw()
     root.attributes('-topmost', True)
-    folder = filedialog.askdirectory(title="Select plate folder")
+    folder = filedialog.askdirectory(title="Select plate folder", initialdir=initial)
     root.destroy()
     return folder if folder else dash.no_update
 
@@ -289,10 +295,11 @@ def browse_folder(n_clicks):
 def browse_output_folder(n_clicks):
     import tkinter as tk
     from tkinter import filedialog
+    initial = cfg.APP_DATA_DIR if os.path.isdir(cfg.APP_DATA_DIR) else None
     root = tk.Tk()
     root.withdraw()
     root.attributes('-topmost', True)
-    folder = filedialog.askdirectory(title="Select output folder")
+    folder = filedialog.askdirectory(title="Select output folder", initialdir=initial)
     root.destroy()
     return folder if folder else dash.no_update
 
@@ -303,6 +310,7 @@ def browse_output_folder(n_clicks):
     Output('folder-status', 'children'),
     Output('plate-folder-store', 'data'),
     Output('output-folder', 'value'),
+    Output('plate-folder', 'value', allow_duplicate=True),
     Input('btn-load', 'n_clicks'),
     State('plate-folder', 'value'),
     prevent_initial_call=True,
@@ -312,17 +320,17 @@ def load_plate(n_clicks, folder):
         from urllib.parse import unquote
         folder = unquote(folder.strip().removeprefix('file://'))
     if not folder or not os.path.isdir(folder):
-        return [], None, "Invalid folder path.", None, ""
+        return [], None, "Invalid folder path.", None, "", dash.no_update
     channels = detect_channels(folder)
     if not channels:
-        return [], None, "No TIF images found in folder.", None, ""
+        return [], None, "No TIF images found in folder.", None, "", dash.no_update
     tifs = glob.glob(os.path.join(folder, "*.tif"))
     options = [{'label': ch, 'value': ch} for ch in channels]
     status = f"Loaded: {len(tifs)} images, {len(channels)} channels."
 
     out_folder = plate_output_dir(folder)
 
-    return options, channels[0], status, folder, out_folder
+    return options, channels[0], status, folder, out_folder, folder
 
 
 @callback(
