@@ -128,6 +128,12 @@ Two complementary metrics are shown:
 
 All dependencies are installed automatically via `pip install .`.
 
+On Debian/Ubuntu, the **Browse** button requires `python3-tk`, which is not available through pip:
+
+```bash
+sudo apt install python3-tk
+```
+
 
 ## Project Structure
 
