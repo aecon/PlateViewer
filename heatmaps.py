@@ -11,10 +11,6 @@ from plate import find_images, parse_well, well_to_row_col
 from image import uint16_to_uint8
 import config as cfg
 
-# Fallback cache directory inside the code directory
-_CODE_DIR = os.path.dirname(os.path.abspath(__file__))
-_FALLBACK_CACHE_DIR = os.path.join(_CODE_DIR, ".cache")
-
 
 # ---------------------------------------------------------------------------
 # Per-image worker functions
@@ -123,7 +119,7 @@ def _cache_path(plate_folder, channel, metric):
     # Fall back to <code_dir>/.cache/<hash>/
     abs_path = os.path.abspath(plate_folder)
     folder_hash = hashlib.sha256(abs_path.encode()).hexdigest()[:12]
-    fallback_dir = os.path.join(_FALLBACK_CACHE_DIR, folder_hash)
+    fallback_dir = os.path.join(cfg.FALLBACK_CACHE_DIR, folder_hash)
     os.makedirs(fallback_dir, exist_ok=True)
     return os.path.join(fallback_dir, filename)
 
