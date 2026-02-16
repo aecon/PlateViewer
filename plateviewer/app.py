@@ -3,8 +3,8 @@
 CRISPR PlateViewer — Dash web interface for high-content screening QC.
 
 Usage:
-    conda run -n PlateViewer python app.py
-    conda run -n PlateViewer python app.py --port 8051
+    plateviewer
+    plateviewer --port 8051
 """
 
 import argparse
@@ -18,13 +18,15 @@ import plotly.graph_objects as go
 
 from PIL import Image
 
-import config as cfg
-from paths import plate_output_dir
-from plate import (find_images, detect_channels, detect_fields, center_field,
-                   parse_well_spec, filter_images_by_wells, sort_by_field, PLATE_FORMATS)
-from image import numpy_to_b64png
-from montage import make_montage, make_well_montage, make_contact_sheet
-from heatmaps import compute_intensity_heatmap, compute_focus_heatmap, compute_plls_heatmap
+from plateviewer import config as cfg
+from plateviewer.paths import plate_output_dir
+from plateviewer.plate import (find_images, detect_channels, detect_fields, center_field,
+                               parse_well_spec, filter_images_by_wells, sort_by_field,
+                               PLATE_FORMATS)
+from plateviewer.image import numpy_to_b64png
+from plateviewer.montage import make_montage, make_well_montage, make_contact_sheet
+from plateviewer.heatmaps import (compute_intensity_heatmap, compute_focus_heatmap,
+                                  compute_plls_heatmap)
 
 # ---------------------------------------------------------------------------
 # Plotly figure helper
@@ -676,11 +678,16 @@ def save_all_plots(n_clicks, channel, folder, plate_fmt, well_spec, output_folde
 # Main
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
-    import webbrowser, threading
+def main():
+    import threading
+    import webbrowser
     parser = argparse.ArgumentParser(description="PlateViewer web interface")
     parser.add_argument("--port", type=int, default=8050, help="Port (default: 8050)")
     parser.add_argument("--debug", action="store_true", help="Enable Dash debug mode")
     args = parser.parse_args()
     threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{args.port}")).start()
     app.run(debug=args.debug, port=args.port)
+
+
+if __name__ == "__main__":
+    main()

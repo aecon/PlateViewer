@@ -3,7 +3,7 @@
 import hashlib
 import os
 
-import config as cfg
+from plateviewer import config as cfg
 
 
 def _plate_data_dir(plate_folder):

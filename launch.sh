@@ -13,5 +13,4 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 eval "$(conda shell.bash hook)"
 conda activate PlateViewer
-cd "$SCRIPT_DIR"
-exec python app.py
+exec plateviewer

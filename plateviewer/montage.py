@@ -15,9 +15,9 @@ import sys
 import numpy as np
 import tifffile
 
-from plate import find_images, parse_filename, parse_well
-from image import uint16_to_uint8, burn_label
-import config as cfg
+from plateviewer.plate import find_images, parse_filename, parse_well
+from plateviewer.image import uint16_to_uint8, burn_label
+from plateviewer import config as cfg
 
 
 def make_montage(image_list, n_images=cfg.MONTAGE_N_IMAGES, rows=cfg.MONTAGE_ROWS,
@@ -246,7 +246,7 @@ def main():
     if args.output:
         out_path = args.output
     else:
-        from paths import plate_output_dir
+        from plateviewer.paths import plate_output_dir
         plate_name = os.path.basename(os.path.normpath(args.plate_folder))
         channel_tag = f"_{args.channel}" if args.channel else ""
         out_path = os.path.join(

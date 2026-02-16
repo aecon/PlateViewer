@@ -6,10 +6,10 @@ import os
 import numpy as np
 import tifffile
 
-from plate import find_images, parse_well, well_to_row_col
-from image import uint16_to_uint8
-from paths import plate_cache_dir
-import config as cfg
+from plateviewer.plate import find_images, parse_well, well_to_row_col
+from plateviewer.image import uint16_to_uint8
+from plateviewer.paths import plate_cache_dir
+from plateviewer import config as cfg
 
 
 # ---------------------------------------------------------------------------

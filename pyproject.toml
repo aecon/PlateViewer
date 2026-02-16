@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "plateviewer"
+version = "1.0.0"
+description = "Dash web interface for high-content screening plate QC"
+requires-python = ">=3.10"
+dependencies = [
+    "dash>=2.0",
+    "kaleido",
+    "numpy",
+    "pillow",
+    "plotly>=5.0",
+    "scikit-image",
+    "scipy",
+    "tifffile",
+]
+
+[project.scripts]
+plateviewer = "plateviewer.app:main"

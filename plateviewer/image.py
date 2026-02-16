@@ -6,7 +6,7 @@ import io
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-import config as cfg
+from plateviewer import config as cfg
 
 
 def uint16_to_uint8(img, plow=cfg.PERCENTILE_LOW, phigh=cfg.PERCENTILE_HIGH):
