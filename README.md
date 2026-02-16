@@ -31,24 +31,12 @@ pip install -r requirements.txt
 
 ## Usage
 
-#### Desktop shortcut (recommended)
-
-Run the installer once from the repo directory to create a Desktop shortcut:
-
-```bash
-bash install_desktop.sh
-```
-
-Double-click the **PlateViewer** shortcut on the Desktop. The browser opens automatically.
-
-#### Command line
-
 ```bash
 conda activate PlateViewer
 plateviewer
 ```
 
-Use `--port 8051` to change the port.
+The browser opens automatically. Use `--port 8051` to change the port.
 
 #### Workflow
 
@@ -154,8 +142,6 @@ plateviewer/           — Python package (installed via pip)
     heatmaps.py        — Plate heatmap computation (threaded I/O, disk caching)
 pyproject.toml         — Package metadata and dependencies
 requirements.txt       — Pinned dependency versions (reproducible environment)
-launch.sh              — Desktop launcher script (activates conda, starts app)
-install_desktop.sh     — Creates and installs the Desktop shortcut
 ```
 
 
