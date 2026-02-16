@@ -2,7 +2,7 @@
 
 Quality control visualization tools for arrayed high-content screening experiments (384-well and 96-well plates).
 
-PlateViewer helps microscopists and screening scientists quickly assess image quality across entire plates. It flags out-of-focus wells, reveals intensity patterns such as edge effects or dispensing artifacts, and lets you visually inspect any well or field — all from a browser-based interface or the command line.
+PlateViewer helps microscopists and screening scientists quickly assess image quality across entire plates. It flags out-of-focus wells, reveals intensity patterns such as edge effects or dispensing artifacts, and lets you visually inspect any well or field — all from a browser-based interface.
 
 ## Requirements
 
@@ -17,15 +17,27 @@ conda activate PlateViewer
 pip install -r requirements.txt
 ```
 
-## Web Interface
+## Usage
 
-#### Usage:
+#### Desktop shortcut (recommended)
+
+Run the installer once from the repo directory to create a Desktop shortcut:
+
+```bash
+bash install_desktop.sh
+```
+
+Double-click the **PlateViewer** shortcut on the Desktop. The browser opens automatically.
+
+#### Command line
 
 ```bash
 conda run -n PlateViewer python app.py
 ```
 
-The browser opens automatically. Use `--port 8051` to change the port.
+Use `--port 8051` to change the port.
+
+#### Workflow
 
 1. Enter the plate folder path (or click **Browse**, or drag-and-drop) and click **Load**
 2. Select a channel and plate format (384-well or 96-well)
@@ -37,9 +49,9 @@ The browser opens automatically. Use `--port 8051` to change the port.
    - **Plate Thumbnails**: plate-layout overview with one thumbnail per well (auto-detected center field, hover for well ID)
    - **Intensity Heatmap**: mean pixel intensity per well (plate layout)
    - **Focus Heatmap**: two heatmaps — Variance of Laplacian (VoL) and Power Log-Log Slope (PLLS) — with an interpretation guide explaining how to read them together.
-5. Click **Save All Plots** to automatically export all plots as PNGs to `<plate_folder>/PlateViewer/`
+5. Click **Save All Plots** to export all plots as PNGs. By default they are saved to `~/PlateViewer_output/<plate_name>/output/`; use the output folder field to choose a different location.
 
-_Note: Heatmap results are cached as `.npy` files in the plate folder. Delete them to force recomputation._
+_Note: Heatmap results are cached as `.npy` files under `~/PlateViewer_output/<plate_name>/cache/`. Delete them to force recomputation._
 
 
 #### Expected File Naming:
@@ -100,24 +112,6 @@ Two complementary metrics are shown:
 ![Focus Heatmaps](docs/images/focus_heatmaps.png)
 
 
-## CLI Montage Tool
-
-```bash
-conda run -n PlateViewer python montage.py /path/to/plate_folder --channel Blue
-```
-
-Options:
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `-c, --channel` | all | Filter by channel name (e.g. `Blue`, `Green2`, `FarRed`) |
-| `-n, --n_images` | 32 | Number of images to sample |
-| `--rows` | 4 | Montage grid rows |
-| `--cols` | 8 | Montage grid columns |
-| `--crop_size` | 1020 | Center crop size in pixels |
-| `-o, --output` | auto | Output TIF path |
-
-
 ## Dependencies
 
 | Package | Purpose |
@@ -137,12 +131,15 @@ All dependencies are installed via `pip install -r requirements.txt`.
 ## Project Structure
 
 ```
+app.py          — Dash web UI (entry point)
 config.py       — Centralized constants (montage params, font path, threading, etc.)
+paths.py        — Output and cache path resolution
 plate.py        — Plate-level logic: file discovery, filename parsing, well utilities
 image.py        — Image utilities: uint8 conversion, label burning, PNG encoding
-montage.py      — Montage assembly (random, single-well, contact sheet) + CLI entry point
+montage.py      — Montage assembly (random, single-well, contact sheet)
 heatmaps.py     — Plate heatmap computation (threaded I/O, disk caching)
-app.py          — Dash web UI (thin, imports from above modules)
+launch.sh             — Desktop launcher script (activates conda, starts app)
+install_desktop.sh    — Creates and installs the Desktop shortcut
 ```
 
 
