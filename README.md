@@ -7,7 +7,7 @@ PlateViewer helps microscopists and screening scientists quickly assess image qu
 ## Requirements
 
 - Python 3.11+
-- Images must be TIFF files (`.tif`) following the **GE InCell Analyzer** naming convention (see [Expected File Naming](#expected-file-naming) below)
+- Images must be TIFF files (`.tif`) following the naming convention described in [Expected File Naming](#expected-file-naming)
 
 ## Installation
 
@@ -57,11 +57,13 @@ _Note: Heatmap results are cached as `.npy` files under `~/PlateViewer_output/<p
 
 #### Expected File Naming:
 
-Images must follow the GE InCell Analyzer naming convention:
+Images must follow the naming convention:
 ```
-ROW - COL(fld FIELD wv WAVELENGTH - CHANNEL).tif
+PREFIX_ROW - COL(fld FIELD wv WAVELENGTH - CHANNEL).tif
 ```
-Example: `A - 01(fld 1 wv 390 - Blue).tif`
+Where `PREFIX_` can also be empty. Examples:  
+*`A - 01(fld 1 wv 390 - Blue).tif`  
+*`Plate1_A - 01(fld 1 wv 390 - Blue).tif`  
 
 
 #### Control well syntax:
