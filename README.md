@@ -11,23 +11,43 @@ PlateViewer helps microscopists and screening scientists quickly assess image qu
 
 ## Installation
 
+### Steps:
+1. Clone this repository to your local computer:
+   * Navigate to the folder where you want to clone (download) this repository.
+   * Clone the repo:
 ```bash
+git clone https://github.com/aecon/PlateViewer.git
+```
+
+2. Install the package:
+
+```bash
+cd PlateViewer
 conda create -n PlateViewer python=3.11
 conda activate PlateViewer
 pip install .
 ```
 
+On Debian/Ubuntu, the **Browse** button requires `python3-tk`, which is not available through pip. In this case install `python3-tk` as below, and then follow step 2 to re-install PlateViewer.
+
+```bash
+sudo apt install python3-tk
+```
+
+### for development:
 For development (editable install — changes take effect immediately):
 
 ```bash
 pip install -e .
 ```
 
-To reproduce the exact tested environment, use the pinned lockfile instead:
+### reproducing the exact tested environment:
+To reproduce the exact tested environment, use the pinned `requirements.txt` instead:
 
 ```bash
 pip install -r requirements.txt
 ```
+
 
 ## Usage
 
@@ -55,9 +75,7 @@ The browser opens automatically. Use `--port 8051` to change the port.
 _Note: Heatmap results are cached as `.npy` files under `~/PlateViewer_output/<plate_name>/cache/`. Delete them to force recomputation._
 
 
-#### Expected File Naming:
-
-Images must follow the naming convention:
+#### Expected File Naming: Images must follow the naming convention below!  
 ```
 PREFIX_ROW - COL(fld FIELD wv WAVELENGTH - CHANNEL).tif
 ```
@@ -130,11 +148,6 @@ Two complementary metrics are shown:
 
 All dependencies are installed automatically via `pip install .`.
 
-On Debian/Ubuntu, the **Browse** button requires `python3-tk`, which is not available through pip:
-
-```bash
-sudo apt install python3-tk
-```
 
 
 ## Project Structure
