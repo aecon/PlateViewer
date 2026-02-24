@@ -63,6 +63,7 @@ The browser opens automatically. Use `--port 8051` to change the port.
 ### Streamlit (optional alternative UI)
 
 ```bash
+conda activate PlateViewer  
 pip install streamlit
 streamlit run plateviewer/app_streamlit.py
 ```
