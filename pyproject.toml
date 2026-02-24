@@ -19,4 +19,4 @@ dependencies = [
 ]
 
 [project.scripts]
-plateviewer = "plateviewer.app:main"
+plateviewer = "plateviewer.app_dash:main"
