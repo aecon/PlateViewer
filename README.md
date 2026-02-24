@@ -138,10 +138,12 @@ Two complementary metrics are shown:
 [MIT License](LICENSE)  
 Copyright (c) 2026 E. Athena Economides
 
-**E. Athena Economides, PhD**  
-Prof. Adriano Aguzzi Lab  
-Institute of Neuropathology  
-University of Zurich & University Hospital Zurich  
-Schmelzbergstrasse 12  
-CH-8091 Zurich  
-Switzerland  
+If you use this software in your research, please cite it as shown in the "Cite this repository" button, and the [CITATION.cff](https://github.com/aecon/PlateViewer/blob/main/CITATION.cff) file.
+
+PlateViewer was developed during Athena's Postdoc at:  
+  *Prof. Adriano Aguzzi Lab*  
+  *Institute of Neuropathology*  
+  *University of Zurich & University Hospital Zurich*  
+  *Schmelzbergstrasse 12*  
+  *CH-8091 Zurich*  
+  *Switzerland*  
