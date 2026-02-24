@@ -51,12 +51,23 @@ pip install -r requirements.txt
 
 ## Usage
 
+### Dash (default)
+
 ```bash
 conda activate PlateViewer
 plateviewer
 ```
 
 The browser opens automatically. Use `--port 8051` to change the port.
+
+### Streamlit (optional alternative UI)
+
+```bash
+pip install streamlit
+streamlit run plateviewer/app_streamlit.py
+```
+
+Both interfaces expose identical functionality. Dash is the default; Streamlit is an optional alternative that requires no extra configuration beyond `pip install streamlit`.
 
 #### Workflow:
 
