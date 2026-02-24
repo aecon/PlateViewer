@@ -133,48 +133,17 @@ Two complementary metrics are shown:
 ![Focus Heatmaps](docs/images/focus_heatmaps.png)
 
 
-## Dependencies
-
-| Package | Purpose |
-|---------|---------|
-| [Dash](https://dash.plotly.com/) | Web UI framework |
-| [Plotly](https://plotly.com/python/) | Interactive plotting |
-| NumPy | Numerical computation |
-| SciPy | Scientific computing |
-| Pillow | Image I/O and processing |
-| scikit-image | Image resizing (contact sheet thumbnails) |
-| tifffile | TIFF file reading |
-| Kaleido | Static image export |
-
-All dependencies are installed automatically via `pip install .`.
-
-
-
-## Project Structure
-
-```
-plateviewer/           — Python package (installed via pip)
-    app.py             — Dash web UI and entry point
-    config.py          — Centralized constants (montage params, font path, threading, etc.)
-    paths.py           — Output and cache path resolution
-    plate.py           — Plate-level logic: file discovery, filename parsing, well utilities
-    image.py           — Image utilities: uint8 conversion, label burning, PNG encoding
-    montage.py         — Montage assembly (random, single-well, contact sheet)
-    heatmaps.py        — Plate heatmap computation (threaded I/O, disk caching)
-pyproject.toml         — Package metadata and dependencies
-requirements.txt       — Pinned dependency versions (reproducible environment)
-```
-
-
 ## License
 
 [MIT License](LICENSE)  
 Copyright (c) 2026 E. Athena Economides
 
-**E. Athena Economides, PhD**  
-Prof. Adriano Aguzzi Lab  
-Institute of Neuropathology  
-University of Zurich & University Hospital Zurich  
-Schmelzbergstrasse 12  
-CH-8091 Zurich  
-Switzerland  
+If you use this software in your research, please cite it as shown in the "Cite this repository" button, and the [CITATION.cff](https://github.com/aecon/PlateViewer/blob/main/CITATION.cff) file.
+
+PlateViewer was developed during Athena's Postdoc at:  
+  *Prof. Adriano Aguzzi Lab*  
+  *Institute of Neuropathology*  
+  *University of Zurich & University Hospital Zurich*  
+  *Schmelzbergstrasse 12*  
+  *CH-8091 Zurich*  
+  *Switzerland*  
