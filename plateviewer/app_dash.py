@@ -5,6 +5,7 @@ CRISPR PlateViewer — Dash web interface for high-content screening QC.
 Usage:
     plateviewer
     plateviewer --port 8051
+    python -m plateviewer.app_dash
 """
 
 import argparse
@@ -248,6 +249,30 @@ app.layout = html.Div([
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _browse_folder_subprocess(title="Select folder", initial=None):
+    """Open a native folder-picker dialog in a subprocess.
+
+    Dash callbacks run in Flask worker threads. On macOS, tkinter requires the
+    main thread, so calling it directly from a callback raises NSException.
+    Spawning a subprocess gives tkinter its own main thread.
+    """
+    import subprocess
+    import sys
+    code = "\n".join([
+        "import tkinter as tk",
+        "from tkinter import filedialog",
+        "root = tk.Tk()",
+        "root.withdraw()",
+        "root.attributes('-topmost', True)",
+        f"result = filedialog.askdirectory(title={repr(title)}, initialdir={repr(initial or '')})",
+        "print(result if result else '', end='')",
+        "root.destroy()",
+    ])
+    proc = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)
+    folder = proc.stdout.strip()
+    return folder if folder else None
+
+
 def _resolve_output_dir(output_folder, plate_folder):
     """Return the output directory to use, creating it if needed.
 
@@ -272,18 +297,12 @@ def _resolve_output_dir(output_folder, plate_folder):
     prevent_initial_call=True,
 )
 def browse_folder(n_clicks, current_folder):
-    import tkinter as tk
-    from tkinter import filedialog
     initial = None
     if current_folder:
         parent = os.path.dirname(os.path.normpath(current_folder))
         if os.path.isdir(parent):
             initial = parent
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes('-topmost', True)
-    folder = filedialog.askdirectory(title="Select plate folder", initialdir=initial)
-    root.destroy()
+    folder = _browse_folder_subprocess("Select plate folder", initial=initial)
     return folder if folder else dash.no_update
 
 
@@ -293,14 +312,8 @@ def browse_folder(n_clicks, current_folder):
     prevent_initial_call=True,
 )
 def browse_output_folder(n_clicks):
-    import tkinter as tk
-    from tkinter import filedialog
     initial = cfg.APP_DATA_DIR if os.path.isdir(cfg.APP_DATA_DIR) else None
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes('-topmost', True)
-    folder = filedialog.askdirectory(title="Select output folder", initialdir=initial)
-    root.destroy()
+    folder = _browse_folder_subprocess("Select output folder", initial=initial)
     return folder if folder else dash.no_update
 
 
